@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { backupCommand } from "./backup.js";
 import { dropCommand } from "./drop.js";
+import { importCommand } from "./import.js";
 import { infoCommand } from "./info.js";
 import { listCommand } from "./list.js";
 import { restoreCommand } from "./restore.js";
@@ -12,6 +13,7 @@ export const databaseCommand = new Command("database")
   .description("Database management commands")
   .addCommand(backupCommand)
   .addCommand(dropCommand)
+  .addCommand(importCommand)
   .addCommand(infoCommand)
   .addCommand(listCommand)
   .addCommand(restoreCommand)
