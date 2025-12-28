@@ -133,7 +133,30 @@ export const installCommand = new Command("install")
     cli.bold("VVV Installation");
     console.log("");
 
-    // Step 1: Check for Vagrant
+    // Step 1: Check if VVV already exists
+    if (existsSync(targetPath)) {
+      const vagrantfile = join(targetPath, "Vagrantfile");
+      if (existsSync(vagrantfile)) {
+        cli.warning(`VVV already exists at ${targetPath}`);
+        console.log("");
+        console.log("To reinstall, first destroy the existing installation:");
+        console.log("  vvvlocal destroy");
+        console.log("");
+        console.log("Or specify a different path:");
+        console.log(`  vvvlocal install --path ~/my-vvv`);
+        process.exit(1);
+      } else {
+        // Directory exists but doesn't look like VVV
+        cli.warning(`Directory ${targetPath} already exists but doesn't appear to be VVV.`);
+        const proceed = await confirm("Do you want to continue anyway?");
+        if (!proceed) {
+          console.log("Installation cancelled.");
+          process.exit(0);
+        }
+      }
+    }
+
+    // Step 2: Check for Vagrant
     if (!isVagrantInstalled()) {
       cli.error("Vagrant is not installed.");
       console.log("");
@@ -147,7 +170,7 @@ export const installCommand = new Command("install")
     const vagrantVersion = getVagrantVersion();
     cli.success(`Vagrant ${vagrantVersion} found`);
 
-    // Step 2: Check for providers
+    // Step 3: Check for providers
     const availableProviders = detectProviders();
 
     if (availableProviders.length === 0) {
@@ -168,7 +191,7 @@ export const installCommand = new Command("install")
       process.exit(1);
     }
 
-    // Step 3: Select provider
+    // Step 4: Select provider
     let selectedProvider: Provider;
 
     if (options.provider) {
@@ -215,29 +238,6 @@ export const installCommand = new Command("install")
     }
 
     cli.success(`Selected provider: ${selectedProvider.displayName}`);
-
-    // Step 4: Check if VVV already exists
-    if (existsSync(targetPath)) {
-      const vagrantfile = join(targetPath, "Vagrantfile");
-      if (existsSync(vagrantfile)) {
-        cli.warning(`VVV already exists at ${targetPath}`);
-        console.log("");
-        console.log("To reinstall, please remove the existing installation first:");
-        console.log(`  rm -rf ${targetPath}`);
-        console.log("");
-        console.log("Or specify a different path:");
-        console.log(`  vvvlocal install --path ~/my-vvv`);
-        process.exit(1);
-      } else {
-        // Directory exists but doesn't look like VVV
-        cli.warning(`Directory ${targetPath} already exists but doesn't appear to be VVV.`);
-        const proceed = await confirm("Do you want to continue anyway?");
-        if (!proceed) {
-          console.log("Installation cancelled.");
-          process.exit(0);
-        }
-      }
-    }
 
     // Step 5: Check for git
     const gitCheck = spawnSync("git", ["--version"], { encoding: "utf-8" });
