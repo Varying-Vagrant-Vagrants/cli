@@ -5,6 +5,7 @@ import { addCommand } from "./add.js";
 import { removeCommand } from "./remove.js";
 import { enableCommand } from "./enable.js";
 import { disableCommand } from "./disable.js";
+import { openCommand } from "./open.js";
 import { updateCommand } from "./update.js";
 
 export const siteCommand = new Command("site")
@@ -14,5 +15,6 @@ export const siteCommand = new Command("site")
   .addCommand(enableCommand)
   .addCommand(infoCommand)
   .addCommand(listCommand)
+  .addCommand(openCommand)
   .addCommand(removeCommand)
   .addCommand(updateCommand);
