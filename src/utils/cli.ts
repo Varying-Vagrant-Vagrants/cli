@@ -4,7 +4,7 @@
 
 import { createInterface } from "readline";
 import { spawnSync } from "child_process";
-import { vvvExists, DEFAULT_VVV_PATH } from "./config.js";
+import { vvvExists, loadConfig } from "./config.js";
 
 // ANSI color codes
 const colors = {
@@ -111,7 +111,6 @@ export function ensureVvvRunning(vvvPath: string): void {
  */
 export function siteExists(vvvPath: string, siteName: string): boolean {
   try {
-    const { loadConfig } = require("./config.js");
     const config = loadConfig(vvvPath);
     return config.sites ? siteName in config.sites : false;
   } catch {

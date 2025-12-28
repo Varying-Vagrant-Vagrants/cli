@@ -41,8 +41,8 @@ async function getLatestVVVVersion(): Promise<string | null> {
       "https://api.github.com/repos/Varying-Vagrant-Vagrants/VVV/releases/latest"
     );
     if (response.ok) {
-      const data = await response.json();
-      return (data.tag_name as string)?.replace(/^v/, "") || null;
+      const data = await response.json() as { tag_name?: string };
+      return data.tag_name?.replace(/^v/, "") || null;
     }
   } catch {
     // Network error, ignore

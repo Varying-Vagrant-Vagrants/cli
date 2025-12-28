@@ -2,8 +2,8 @@
  * Shared Vagrant utilities for executing vagrant commands.
  */
 
-import { spawn, spawnSync, type SpawnSyncReturns, type ChildProcess } from "child_process";
-import { cli, exitWithError } from "./cli.js";
+import { spawn, spawnSync, type SpawnSyncReturns } from "child_process";
+import { exitWithError } from "./cli.js";
 
 /**
  * Check if Vagrant is installed and available in PATH.

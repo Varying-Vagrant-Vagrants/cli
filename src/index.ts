@@ -139,7 +139,6 @@ program
   });
 
 // Override help for root command only
-const originalHelp = program.helpInformation.bind(program);
 program.helpInformation = function() {
   return formatGroupedHelp(program);
 };

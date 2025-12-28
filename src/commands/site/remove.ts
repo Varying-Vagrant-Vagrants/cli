@@ -37,7 +37,12 @@ export const removeCommand = new Command("remove")
 
     // Get site config for path info
     const config = loadConfig(vvvPath);
-    const siteConfig = config.sites[name];
+    const siteConfig = config.sites?.[name];
+
+    if (!siteConfig) {
+      exitWithError(`Site '${name}' not found in config.`);
+    }
+
     const sitePath = getSiteLocalPath(vvvPath, name, siteConfig);
 
     // Confirm removal unless --force is used

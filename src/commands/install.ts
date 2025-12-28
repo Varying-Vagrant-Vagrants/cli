@@ -185,7 +185,11 @@ export const installCommand = new Command("install")
       selectedProvider = found;
     } else if (availableProviders.length === 1) {
       // Only one provider available
-      selectedProvider = availableProviders[0];
+      const provider = availableProviders[0];
+      if (!provider) {
+        exitWithError("No providers available.");
+      }
+      selectedProvider = provider;
       cli.success(`Using ${selectedProvider.displayName} as provider`);
     } else {
       // Multiple providers - ask user to choose
@@ -202,11 +206,12 @@ export const installCommand = new Command("install")
       );
       const index = parseInt(choice, 10) - 1;
 
-      if (isNaN(index) || index < 0 || index >= availableProviders.length) {
+      const provider = availableProviders[index];
+      if (!provider) {
         exitWithError("Invalid selection.");
       }
 
-      selectedProvider = availableProviders[index];
+      selectedProvider = provider;
     }
 
     cli.success(`Selected provider: ${selectedProvider.displayName}`);

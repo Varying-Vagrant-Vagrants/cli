@@ -18,9 +18,12 @@ export const infoCommand = new Command("info")
 
     try {
       const config = loadConfig(vvvPath);
-      const sites = config.sites;
+      const site = config.sites?.[name];
 
-      const site = sites[name];
+      if (!site) {
+        exitWithError(`Site '${name}' not found in config.`);
+      }
+
       const localPath = getSiteLocalPath(vvvPath, name, site);
       const vmPath = getSiteVmPath(name, site);
 

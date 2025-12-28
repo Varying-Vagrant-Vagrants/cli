@@ -97,11 +97,11 @@ export function enableExtension(
     extensions = doc.get("extensions") as any;
   }
 
-  let extArray = extensions.get(extension);
+  const extArray = extensions.get(extension);
   if (!extArray) {
     extensions.set(extension, [provisioner]);
   } else {
-    const items = extArray.items.map((item: any) => item.value);
+    const items = extArray.items.map((item: unknown) => (item as { value: string }).value);
     if (!items.includes(provisioner)) {
       extArray.add(provisioner);
     }

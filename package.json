@@ -16,11 +16,18 @@
     "build:darwin-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/vvvlocal-darwin-x64",
     "build:darwin-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/vvvlocal-darwin-arm64",
     "build:windows-x64": "bun build src/index.ts --compile --target=bun-windows-x64 --outfile=dist/vvvlocal-windows-x64.exe",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run lint"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/bun": "latest",
-    "react-devtools-core": "^7.0.1"
+    "eslint": "^9.39.2",
+    "react-devtools-core": "^7.0.1",
+    "typescript-eslint": "^8.50.1"
   },
   "peerDependencies": {
     "typescript": "^5"
