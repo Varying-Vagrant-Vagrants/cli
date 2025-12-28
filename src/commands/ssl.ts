@@ -1,24 +1,23 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, copyFileSync } from "fs";
 import { join } from "path";
-import { tmpdir, platform } from "os";
+import { platform } from "os";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, ensureVvvRunning, cli, exitWithError } from "../utils/cli.js";
-import { ensureVagrantInstalled, vagrantSshSync } from "../utils/vagrant.js";
-
-const CA_PATH_IN_VM = "/srv/certificates/ca/ca.crt";
-const CERTS_DIR_IN_VM = "/srv/certificates";
+import { ensureVvvExists, cli, exitWithError } from "../utils/cli.js";
 
 /**
- * Get the CA certificate content from the VM.
+ * Get the local certificates directory path.
  */
-function getCaCertificate(vvvPath: string): string | null {
-  const result = vagrantSshSync(`sudo cat ${CA_PATH_IN_VM} 2>/dev/null`, vvvPath);
-  if (result.status === 0 && result.stdout.includes("BEGIN CERTIFICATE")) {
-    return result.stdout.trim();
-  }
-  return null;
+function getCertsDir(vvvPath: string): string {
+  return join(vvvPath, "certificates");
+}
+
+/**
+ * Get the CA certificate path.
+ */
+function getCaPath(vvvPath: string): string {
+  return join(getCertsDir(vvvPath), "ca", "ca.crt");
 }
 
 /**
@@ -99,32 +98,34 @@ const listCommand = new Command("list")
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
-    ensureVagrantInstalled();
-    ensureVvvRunning(vvvPath);
 
-    // List certificate directories
-    const result = vagrantSshSync(`ls -1 ${CERTS_DIR_IN_VM} 2>/dev/null | grep -v ca`, vvvPath);
+    const certsDir = getCertsDir(vvvPath);
 
-    if (result.status !== 0) {
+    if (!existsSync(certsDir)) {
       if (options.json) {
-        console.log(JSON.stringify({ success: false, error: "Failed to list certificates" }, null, 2));
+        console.log(JSON.stringify({ success: false, error: `Certificates directory not found: ${certsDir}` }, null, 2));
         process.exit(1);
       }
-      exitWithError("Failed to list certificates");
+      exitWithError(`Certificates directory not found: ${certsDir}\nMake sure VVV has been provisioned at least once.`);
     }
 
-    const sites = result.stdout.trim().split("\n").filter(s => s.trim());
+    // List certificate directories (exclude 'ca' directory)
+    const sites = readdirSync(certsDir)
+      .filter(name => {
+        const fullPath = join(certsDir, name);
+        return statSync(fullPath).isDirectory() && name !== "ca";
+      })
+      .sort();
 
     // Get cert details for each site
     const certs: Array<{ site: string; path: string; exists: boolean }> = [];
 
     for (const site of sites) {
-      const certPath = `${CERTS_DIR_IN_VM}/${site}/${site}.crt`;
-      const checkResult = vagrantSshSync(`test -f ${certPath} && echo "exists"`, vvvPath);
+      const certPath = join(certsDir, site, "dev.crt");
       certs.push({
         site,
         path: certPath,
-        exists: checkResult.stdout.trim() === "exists",
+        exists: existsSync(certPath),
       });
     }
 
@@ -186,8 +187,6 @@ const trustCommand = new Command("trust")
     }
 
     ensureVvvExists(vvvPath);
-    ensureVagrantInstalled();
-    ensureVvvRunning(vvvPath);
 
     // Check if already trusted
     if (isCaTrusted()) {
@@ -199,29 +198,24 @@ const trustCommand = new Command("trust")
       return;
     }
 
-    // Get CA certificate from VM
-    const caCert = getCaCertificate(vvvPath);
-    if (!caCert) {
+    // Get CA certificate from local path
+    const caPath = getCaPath(vvvPath);
+    if (!existsSync(caPath)) {
       if (options.json) {
-        console.log(JSON.stringify({ success: false, error: "Could not retrieve CA certificate from VM" }, null, 2));
+        console.log(JSON.stringify({ success: false, error: `CA certificate not found: ${caPath}` }, null, 2));
         process.exit(1);
       }
-      exitWithError("Could not retrieve CA certificate from VM.\nMake sure VVV is running and the tls-ca extension is enabled.");
+      exitWithError(`CA certificate not found: ${caPath}\nMake sure VVV has been provisioned and the tls-ca extension is enabled.`);
     }
-
-    // Write to temp file
-    const tempDir = tmpdir();
-    const tempCertPath = join(tempDir, "vvv-ca.crt");
-    writeFileSync(tempCertPath, caCert);
 
     // Trust based on platform
     const plat = platform();
     let success = false;
 
     if (plat === "darwin") {
-      success = trustCaMac(tempCertPath);
+      success = trustCaMac(caPath);
     } else if (plat === "linux") {
-      success = trustCaLinux(tempCertPath);
+      success = trustCaLinux(caPath);
     } else if (plat === "win32") {
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: "Windows trust not yet implemented" }, null, 2));
@@ -229,14 +223,10 @@ const trustCommand = new Command("trust")
       }
       cli.warning("Windows certificate trust requires manual steps:");
       console.log("");
-      console.log("1. Copy the CA certificate from the VM:");
-      console.log(`   vagrant ssh -c 'cat ${CA_PATH_IN_VM}' > vvv-ca.crt`);
+      console.log(`1. Open the CA certificate: ${caPath}`);
       console.log("");
       console.log("2. Double-click the certificate and install to 'Trusted Root Certification Authorities'");
       console.log("");
-
-      // Cleanup temp file
-      unlinkSync(tempCertPath);
       return;
     } else {
       if (options.json) {
@@ -244,13 +234,6 @@ const trustCommand = new Command("trust")
         process.exit(1);
       }
       exitWithError(`Unsupported platform: ${plat}`);
-    }
-
-    // Cleanup temp file
-    try {
-      unlinkSync(tempCertPath);
-    } catch {
-      // Ignore cleanup errors
     }
 
     if (options.json) {
