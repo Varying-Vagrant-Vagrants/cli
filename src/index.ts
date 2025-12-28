@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, openCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {
@@ -34,7 +34,7 @@ const commandGroups = [
   },
   {
     name: "Site Management",
-    commands: ["site"],
+    commands: ["site", "open"],
   },
   {
     name: "Extension Management",
@@ -46,11 +46,11 @@ const commandGroups = [
   },
   {
     name: "PHP",
-    commands: ["php"],
+    commands: ["php", "xdebug"],
   },
   {
     name: "System",
-    commands: ["info", "install", "providers", "upgrade"],
+    commands: ["config", "info", "install", "providers", "upgrade"],
   },
 ];
 
@@ -147,12 +147,14 @@ program.helpInformation = function() {
   return formatGroupedHelp(program);
 };
 
+program.addCommand(configCommand);
 program.addCommand(databaseCommand);
 program.addCommand(destroyCommand);
 program.addCommand(execCommand);
 program.addCommand(extensionCommand);
 program.addCommand(infoCommand);
 program.addCommand(installCommand);
+program.addCommand(openCommand);
 program.addCommand(phpCommand);
 program.addCommand(providersCommand);
 program.addCommand(reprovisionCommand);
@@ -163,5 +165,6 @@ program.addCommand(statusCommand);
 program.addCommand(stopCommand);
 program.addCommand(upCommand);
 program.addCommand(upgradeCommand);
+program.addCommand(xdebugCommand);
 
 program.parse();
