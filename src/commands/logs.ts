@@ -1,23 +1,19 @@
 import { Command } from "commander";
 import { spawn, spawnSync } from "child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { ensureVvvExists, cli, exitWithError } from "../utils/cli.js";
 
 // Log types and their relative paths within vvvPath/log/
 const LOG_TYPES: Record<string, { path: string; description: string }> = {
-  nginx: { path: "nginx/error.log", description: "Nginx error log" },
   "nginx-error": { path: "nginx/error.log", description: "Nginx error log" },
   "nginx-access": { path: "nginx/access.log", description: "Nginx access log" },
   php: { path: "php/", description: "PHP-FPM log (specify version with --php-version)" },
   "php-errors": { path: "php/", description: "PHP error log (specify version with --php-version)" },
   xdebug: { path: "php/xdebug-remote.log", description: "Xdebug remote log" },
   mysql: { path: "mysql/error.log", description: "MySQL/MariaDB error log" },
-  mariadb: { path: "mysql/error.log", description: "MySQL/MariaDB error log" },
   memcached: { path: "memcached/memcached.log", description: "Memcached log" },
-  provisioner: { path: "provisioners/", description: "VVV provisioning logs" },
-  vvv: { path: "provisioners/", description: "VVV provisioning logs" },
 };
 
 /**
@@ -40,37 +36,6 @@ function getAvailablePhpVersions(vvvPath: string): string[] {
   }
 
   return versions.sort();
-}
-
-/**
- * Get the most recent provisioner log directory.
- */
-function getLatestProvisionerLog(vvvPath: string): string | null {
-  const provisionerDir = join(vvvPath, "log", "provisioners");
-  if (!existsSync(provisionerDir)) {
-    return null;
-  }
-
-  const dirs = readdirSync(provisionerDir)
-    .filter(d => statSync(join(provisionerDir, d)).isDirectory())
-    .sort()
-    .reverse();
-
-  const latestDirName = dirs[0];
-  if (!latestDirName) {
-    return null;
-  }
-
-  // Get the main provisioner log from the latest directory
-  const latestDir = join(provisionerDir, latestDirName);
-  const logs = readdirSync(latestDir).filter(f => f.endsWith(".log"));
-  const firstLog = logs[0];
-
-  if (firstLog) {
-    return join(latestDir, firstLog);
-  }
-
-  return null;
 }
 
 /**
@@ -97,11 +62,6 @@ function resolveLogPath(logType: string, vvvPath: string, phpVersion?: string): 
     return join(logDir, "php", `php${version}-fpm.log`);
   }
 
-  // Handle provisioner logs
-  if (logType === "provisioner" || logType === "vvv") {
-    return getLatestProvisionerLog(vvvPath);
-  }
-
   // Standard log types
   const logInfo = LOG_TYPES[logType];
   if (!logInfo) {
@@ -112,7 +72,7 @@ function resolveLogPath(logType: string, vvvPath: string, phpVersion?: string): 
   return existsSync(logPath) ? logPath : null;
 }
 
-const VALID_LOG_TYPES = Object.keys(LOG_TYPES).filter(k => !["nginx-error", "mariadb", "vvv"].includes(k));
+const VALID_LOG_TYPES = Object.keys(LOG_TYPES);
 
 export const logsCommand = new Command("logs")
   .description("View service logs from the local VVV log directory")
@@ -155,7 +115,6 @@ export const logsCommand = new Command("logs")
       cli.bold("Available Log Types");
       console.log("");
       for (const [name, info] of Object.entries(LOG_TYPES)) {
-        if (["nginx-error", "mariadb", "vvv"].includes(name)) continue; // Skip aliases
         console.log(`  ${name.padEnd(15)} ${cli.format.dim(info.description)}`);
       }
 
@@ -240,7 +199,7 @@ export const logsCommand = new Command("logs")
       // Build tail command with optional grep
       const tailArgs = ["-f", "-n", String(lines), logPath];
 
-      if (options.site && (logType === "nginx" || logType === "nginx-access" || logType === "nginx-error")) {
+      if (options.site && (logType === "nginx-access" || logType === "nginx-error")) {
         // Use shell to pipe through grep
         const tailCmd = `tail -f -n ${lines} "${logPath}" | grep --line-buffered '${options.site}'`;
         const child = spawn("sh", ["-c", tailCmd], { stdio: "inherit" });
@@ -271,7 +230,7 @@ export const logsCommand = new Command("logs")
     }
 
     // Filter by site if specified
-    if (options.site && (logType === "nginx" || logType === "nginx-access" || logType === "nginx-error")) {
+    if (options.site && (logType === "nginx-access" || logType === "nginx-error")) {
       const siteFilter = options.site.toLowerCase();
       logContent = logContent
         .split("\n")
