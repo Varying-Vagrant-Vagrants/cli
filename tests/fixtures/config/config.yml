@@ -1,0 +1,31 @@
+---
+sites:
+  wordpress-one:
+    repo: https://github.com/Varying-Vagrant-Vagrants/custom-site-template.git
+    hosts:
+      - one.wordpress.test
+    custom:
+      wpversion: latest
+  wordpress-two:
+    skip_provisioning: true
+    repo: https://github.com/Varying-Vagrant-Vagrants/custom-site-template.git
+    hosts:
+      - two.wordpress.test
+  wordpress-develop:
+    repo: https://github.com/Varying-Vagrant-Vagrants/vvv-wordpress-develop.git
+    hosts:
+      - src.wordpress-develop.test
+      - build.wordpress-develop.test
+
+extensions:
+  core:
+    - tls-ca
+    - phpmyadmin
+
+vm_config:
+  provider: virtualbox
+  memory: 2048
+  cores: 2
+
+general:
+  db_backup: true
