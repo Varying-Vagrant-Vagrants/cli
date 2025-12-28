@@ -38,6 +38,7 @@ export const listCommand = new Command("list")
           description: site.description,
           php: site.php,
           skipped: site.skip_provisioning === true,
+          path: `${vvvPath}/www/${name}`,
         }));
 
       if (options.json) {
