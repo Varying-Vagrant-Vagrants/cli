@@ -5,56 +5,7 @@ import { platform } from "os";
 import { join } from "path";
 import { cli, askQuestion, confirm, exitWithError } from "../utils/cli.js";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-
-interface Provider {
-  name: string;
-  command: string;
-  args: string[];
-  displayName: string;
-  vagrantName: string;
-}
-
-const PROVIDERS: Provider[] = [
-  {
-    name: "virtualbox",
-    command: "VBoxManage",
-    args: ["--version"],
-    displayName: "VirtualBox",
-    vagrantName: "virtualbox",
-  },
-  {
-    name: "docker",
-    command: "docker",
-    args: ["--version"],
-    displayName: "Docker",
-    vagrantName: "docker",
-  },
-  {
-    name: "parallels",
-    command: "prlctl",
-    args: ["--version"],
-    displayName: "Parallels Desktop",
-    vagrantName: "parallels",
-  },
-  {
-    name: "vmware",
-    command: "vmrun",
-    args: ["-T", "ws", "list"],
-    displayName: "VMware",
-    vagrantName: "vmware_desktop",
-  },
-];
-
-// Add Hyper-V only on Windows
-if (platform() === "win32") {
-  PROVIDERS.push({
-    name: "hyperv",
-    command: "powershell",
-    args: ["-Command", "(Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State"],
-    displayName: "Hyper-V",
-    vagrantName: "hyperv",
-  });
-}
+import { type Provider, detectAvailableProviders } from "../utils/providers.js";
 
 function isVagrantInstalled(): boolean {
   const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8" });
@@ -67,28 +18,6 @@ function getVagrantVersion(): string | null {
     return result.stdout.trim().replace("Vagrant ", "");
   }
   return null;
-}
-
-function detectProviders(): Provider[] {
-  const available: Provider[] = [];
-
-  for (const provider of PROVIDERS) {
-    const result = spawnSync(provider.command, provider.args, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    // Special handling for Hyper-V check
-    if (provider.name === "hyperv") {
-      if (result.status === 0 && result.stdout.includes("Enabled")) {
-        available.push(provider);
-      }
-    } else if (result.status === 0) {
-      available.push(provider);
-    }
-  }
-
-  return available;
 }
 
 function cloneVVV(targetPath: string, branch: string): Promise<number> {
@@ -171,7 +100,7 @@ export const installCommand = new Command("install")
     cli.success(`Vagrant ${vagrantVersion} found`);
 
     // Step 3: Check for providers
-    const availableProviders = detectProviders();
+    const availableProviders = detectAvailableProviders();
 
     if (availableProviders.length === 0) {
       cli.error("No supported virtualization provider found.");
