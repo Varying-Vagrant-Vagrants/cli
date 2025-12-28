@@ -4,6 +4,7 @@ export { restartCommand } from "./restart.js";
 export { statusCommand } from "./status.js";
 export { reprovisionCommand } from "./reprovision.js";
 export { sshCommand } from "./ssh.js";
+export { destroyCommand } from "./destroy.js";
 export { infoCommand } from "./info.js";
 export { siteCommand } from "./site/index.js";
 export { extensionCommand } from "./extension/index.js";
