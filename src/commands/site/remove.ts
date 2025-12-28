@@ -1,31 +1,8 @@
 import { Command } from "commander";
-import { createInterface } from "readline";
 import { readFileSync, writeFileSync } from "fs";
 import { parseDocument } from "yaml";
-import { vvvExists, loadConfig, getConfigPath, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
-
-function askQuestion(question: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase().trim());
-    });
-  });
-}
-
-function siteExists(vvvPath: string, siteName: string): boolean {
-  try {
-    const config = loadConfig(vvvPath);
-    return config.sites ? siteName in config.sites : false;
-  } catch {
-    return false;
-  }
-}
+import { loadConfig, getConfigPath, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { ensureVvvExists, ensureSiteExists, confirm, cli, exitWithError } from "../../utils/cli.js";
 
 function removeSiteFromConfig(vvvPath: string, siteName: string): void {
   const configPath = getConfigPath(vvvPath);
@@ -55,29 +32,23 @@ export const removeCommand = new Command("remove")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
+    ensureSiteExists(vvvPath, name);
 
-    // Check if site exists and get its config
+    // Get site config for path info
     const config = loadConfig(vvvPath);
-    if (!config.sites || !config.sites[name]) {
-      console.error(`Site '${name}' does not exist.`);
-      process.exit(1);
-    }
     const siteConfig = config.sites[name];
     const sitePath = getSiteLocalPath(vvvPath, name, siteConfig);
 
     // Confirm removal unless --force is used
     if (!options.force) {
-      console.log(`\x1b[33mWarning:\x1b[0m This will remove site '${name}' from the VVV configuration.`);
+      cli.warning(`Warning: This will remove site '${name}' from the VVV configuration.`);
       console.log("The site files will remain on disk until you reprovision.");
       console.log("");
 
-      const answer = await askQuestion(`Are you sure you want to remove '${name}'? (y/n): `);
+      const confirmed = await confirm(`Are you sure you want to remove '${name}'?`);
 
-      if (answer !== "y" && answer !== "yes") {
+      if (!confirmed) {
         console.log("Removal cancelled.");
         process.exit(0);
       }
@@ -88,16 +59,15 @@ export const removeCommand = new Command("remove")
     try {
       removeSiteFromConfig(vvvPath, name);
 
-      console.log(`Site '${name}' removed from configuration.`);
+      cli.success(`Site '${name}' removed from configuration.`);
       console.log("");
-      console.log("\x1b[33mNote:\x1b[0m The site files and database still exist.");
-      console.log("Run \x1b[1mvvvlocal reprovision\x1b[0m to update the VM.");
+      cli.warning("Note: The site files and database still exist.");
+      console.log(`Run ${cli.format.bold("vvvlocal reprovision")} to update the VM.`);
       console.log("");
       console.log("To completely remove the site:");
       console.log(`  Files:    ${sitePath}`);
-      console.log("  Database: use \x1b[1mvvvlocal db list\x1b[0m to find and manually remove any databases");
+      console.log(`  Database: use ${cli.format.bold("vvvlocal db list")} to find and manually remove any databases`);
     } catch (error) {
-      console.error(`Failed to remove site: ${error}`);
-      process.exit(1);
+      exitWithError(`Failed to remove site: ${error}`);
     }
   });

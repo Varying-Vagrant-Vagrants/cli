@@ -1,33 +1,8 @@
 import { Command } from "commander";
-import { createInterface } from "readline";
 import { readFileSync, writeFileSync } from "fs";
 import { parseDocument } from "yaml";
-import { vvvExists, loadConfig, getConfigPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
-
-function askQuestion(question: string, defaultValue?: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
-
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      rl.close();
-      resolve(answer.trim() || defaultValue || "");
-    });
-  });
-}
-
-function siteExists(vvvPath: string, siteName: string): boolean {
-  try {
-    const config = loadConfig(vvvPath);
-    return config.sites ? siteName in config.sites : false;
-  } catch {
-    return false;
-  }
-}
+import { getConfigPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { ensureVvvExists, ensureSiteNotExists, askQuestion, cli, exitWithError } from "../../utils/cli.js";
 
 function addSiteToConfig(
   vvvPath: string,
@@ -89,23 +64,14 @@ export const addCommand = new Command("add")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
-
-    // Check for duplicate site
-    if (siteExists(vvvPath, name)) {
-      console.error(`Site '${name}' already exists.`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
+    ensureSiteNotExists(vvvPath, name);
 
     // Validate custom paths - both must be specified together
     const localDir = options.localDir;
     const vmDir = options.vmDir;
     if ((localDir && !vmDir) || (!localDir && vmDir)) {
-      console.error("Both --local-dir and --vm-dir must be specified together.");
-      process.exit(1);
+      exitWithError("Both --local-dir and --vm-dir must be specified together.");
     }
 
     let description = options.description;
@@ -155,7 +121,7 @@ export const addCommand = new Command("add")
         vmDir,
       });
 
-      console.log(`\nSite '${name}' added successfully!`);
+      cli.success(`\nSite '${name}' added successfully!`);
       console.log("");
       console.log("Site configuration:");
       console.log(`  Hosts: ${hosts.join(", ")}`);
@@ -170,9 +136,8 @@ export const addCommand = new Command("add")
         console.log(`  VM path: ${vmDir}`);
       }
       console.log("");
-      console.log("\x1b[33mNote:\x1b[0m Run \x1b[1mvvvlocal reprovision\x1b[0m to create the site.");
+      cli.warning(`Note: Run ${cli.format.bold("vvvlocal reprovision")} to create the site.`);
     } catch (error) {
-      console.error(`Failed to add site: ${error}`);
-      process.exit(1);
+      exitWithError(`Failed to add site: ${error}`);
     }
   });

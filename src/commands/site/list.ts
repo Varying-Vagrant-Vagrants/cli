@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
-import { loadConfig, vvvExists, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { loadConfig, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { ensureVvvExists, exitWithError } from "../../utils/cli.js";
 import { SiteTable } from "../../components/SiteTable.js";
 
 export const listCommand = new Command("list")
@@ -12,10 +13,7 @@ export const listCommand = new Command("list")
   .action((options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
 
     try {
       const config = loadConfig(vvvPath);
@@ -48,7 +46,6 @@ export const listCommand = new Command("list")
 
       render(React.createElement(SiteTable, { sites: siteList }));
     } catch (error) {
-      console.error(`Error reading config: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError(`Error reading config: ${(error as Error).message}`);
     }
   });

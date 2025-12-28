@@ -1,56 +1,25 @@
 import { Command } from "commander";
-import { spawn } from "child_process";
-import { existsSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
-
-const DEFAULT_VVV_PATH = join(homedir(), "vvv-local");
-
-function runVagrantCommand(
-  command: string[],
-  vvvPath: string,
-  onComplete: (code: number) => void
-): void {
-  const vagrant = spawn("vagrant", command, {
-    cwd: vvvPath,
-    stdio: "inherit",
-  });
-
-  vagrant.on("close", (code) => {
-    onComplete(code ?? 1);
-  });
-}
+import { DEFAULT_VVV_PATH } from "../utils/config.js";
+import { ensureVvvExists, exitWithError } from "../utils/cli.js";
+import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 
 export const restartCommand = new Command("restart")
   .alias("reload")
   .description("Restart VVV (halt then up)")
   .option("--path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
-  .action((options) => {
+  .action(async (options) => {
     const vvvPath = options.path;
 
-    if (!existsSync(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      console.error("Run 'vvvlocal install' to install VVV");
-      process.exit(1);
-    }
-
-    const vagrantCheck = Bun.spawnSync(["which", "vagrant"]);
-    if (vagrantCheck.exitCode !== 0) {
-      console.error("Vagrant is not installed or not in PATH");
-      console.error("Run 'vvvlocal install' to install prerequisites");
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
+    ensureVagrantInstalled();
 
     console.log("Stopping VVV...");
-    runVagrantCommand(["halt"], vvvPath, (haltCode) => {
-      if (haltCode !== 0) {
-        console.error("Failed to stop VVV");
-        process.exit(haltCode);
-      }
+    const haltCode = await vagrantRun(["halt"], vvvPath);
+    if (haltCode !== 0) {
+      exitWithError("Failed to stop VVV");
+    }
 
-      console.log("\nStarting VVV...");
-      runVagrantCommand(["up"], vvvPath, (upCode) => {
-        process.exit(upCode);
-      });
-    });
+    console.log("\nStarting VVV...");
+    const upCode = await vagrantRun(["up"], vvvPath);
+    process.exit(upCode);
   });

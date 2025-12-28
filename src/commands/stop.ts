@@ -1,10 +1,7 @@
 import { Command } from "commander";
-import { spawn } from "child_process";
-import { existsSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
-
-const DEFAULT_VVV_PATH = join(homedir(), "vvv-local");
+import { DEFAULT_VVV_PATH } from "../utils/config.js";
+import { ensureVvvExists } from "../utils/cli.js";
+import { ensureVagrantInstalled, vagrantRunAndExit } from "../utils/vagrant.js";
 
 export const stopCommand = new Command("stop")
   .alias("halt")
@@ -13,25 +10,10 @@ export const stopCommand = new Command("stop")
   .action((options) => {
     const vvvPath = options.path;
 
-    if (!existsSync(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
-
-    const vagrantCheck = Bun.spawnSync(["which", "vagrant"]);
-    if (vagrantCheck.exitCode !== 0) {
-      console.error("Vagrant is not installed or not in PATH");
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
+    ensureVagrantInstalled();
 
     console.log("Stopping VVV...");
 
-    const vagrant = spawn("vagrant", ["halt"], {
-      cwd: vvvPath,
-      stdio: "inherit",
-    });
-
-    vagrant.on("close", (code) => {
-      process.exit(code ?? 0);
-    });
+    vagrantRunAndExit(["halt"], vvvPath);
   });

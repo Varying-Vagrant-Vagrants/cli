@@ -3,7 +3,8 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import React from "react";
 import { render } from "ink";
-import { vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { ensureVvvExists } from "../../utils/cli.js";
 import { DatabaseInfo } from "../../components/DatabaseInfo.js";
 
 interface ConnectionDetails {
@@ -59,10 +60,7 @@ export const infoCommand = new Command("info")
   .action((options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
 
     const details = parseSequelProFile(vvvPath) || getDefaultDetails();
 

@@ -5,7 +5,8 @@ import { join } from "path";
 import { arch, platform, release } from "os";
 import React from "react";
 import { render } from "ink";
-import { loadConfig, vvvExists, DEFAULT_VVV_PATH } from "../utils/config.js";
+import { loadConfig, DEFAULT_VVV_PATH } from "../utils/config.js";
+import { ensureVvvExists } from "../utils/cli.js";
 import { SystemInfo } from "../components/SystemInfo.js";
 
 function getVVVVersion(vvvPath: string): string {
@@ -118,10 +119,7 @@ export const infoCommand = new Command("info")
   .action(async (options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
 
     const gitInstall = isGitInstall(vvvPath);
     const gitBranch = getGitBranch(vvvPath);

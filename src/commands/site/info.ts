@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
-import { loadConfig, vvvExists, getSiteLocalPath, getSiteVmPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { loadConfig, getSiteLocalPath, getSiteVmPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { ensureVvvExists, ensureSiteExists, exitWithError } from "../../utils/cli.js";
 import { SiteInfo } from "../../components/SiteInfo.js";
 
 export const infoCommand = new Command("info")
@@ -12,19 +13,12 @@ export const infoCommand = new Command("info")
   .action((name, options) => {
     const vvvPath = options.path;
 
-    if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
-    }
+    ensureVvvExists(vvvPath);
+    ensureSiteExists(vvvPath, name);
 
     try {
       const config = loadConfig(vvvPath);
       const sites = config.sites;
-
-      if (!sites || !sites[name]) {
-        console.error(`Site '${name}' not found`);
-        process.exit(1);
-      }
 
       const site = sites[name];
       const localPath = getSiteLocalPath(vvvPath, name, site);
@@ -37,7 +31,6 @@ export const infoCommand = new Command("info")
 
       render(React.createElement(SiteInfo, { name, site, localPath, vmPath }));
     } catch (error) {
-      console.error(`Error reading config: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError(`Error reading config: ${(error as Error).message}`);
     }
   });
