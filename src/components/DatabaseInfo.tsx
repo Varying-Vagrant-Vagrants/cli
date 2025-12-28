@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, Box } from "ink";
+import { colors } from "../utils/theme.js";
 
 interface DatabaseInfoProps {
   host: string;
@@ -21,49 +22,49 @@ export function DatabaseInfo({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">Database Connection</Text>
+        <Text bold color={colors.ui.highlight}>Database Connection</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Host</Text>
+          <Text bold color={colors.ui.label}>Host</Text>
         </Box>
-        <Text color="blue">{host}</Text>
+        <Text color={colors.data.hostname}>{host}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Port</Text>
+          <Text bold color={colors.ui.label}>Port</Text>
         </Box>
-        <Text>{port}</Text>
+        <Text color={colors.data.value}>{port}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">User</Text>
+          <Text bold color={colors.ui.label}>User</Text>
         </Box>
-        <Text color="green">{user}</Text>
+        <Text color={colors.data.name}>{user}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Password</Text>
+          <Text bold color={colors.ui.label}>Password</Text>
         </Box>
-        <Text color="yellow">{password}</Text>
+        <Text color={colors.status.warning}>{password}</Text>
       </Box>
 
       {version && (
         <Box>
           <Box width={labelWidth}>
-            <Text bold color="whiteBright">Version</Text>
+            <Text bold color={colors.ui.label}>Version</Text>
           </Box>
-          <Text color="gray">{version}</Text>
+          <Text color={colors.data.version}>{version}</Text>
         </Box>
       )}
 
       <Box marginTop={1} flexDirection="column">
-        <Text bold color="whiteBright">Connection String</Text>
-        <Text color="gray">mysql://{user}:{password}@{host}:{port}</Text>
+        <Text bold color={colors.ui.label}>Connection String</Text>
+        <Text color={colors.text.secondary}>mysql://{user}:{password}@{host}:{port}</Text>
       </Box>
     </Box>
   );

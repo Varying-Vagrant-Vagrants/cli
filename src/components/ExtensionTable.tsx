@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, Box } from "ink";
+import { colors } from "../utils/theme.js";
 
 interface Extension {
   extension: string;
@@ -13,7 +14,7 @@ interface ExtensionTableProps {
 
 export function ExtensionTable({ extensions }: ExtensionTableProps) {
   if (extensions.length === 0) {
-    return <Text color="yellow">No extensions installed.</Text>;
+    return <Text color={colors.status.warning}>No extensions installed.</Text>;
   }
 
   // Group by extension
@@ -26,7 +27,7 @@ export function ExtensionTable({ extensions }: ExtensionTableProps) {
 
   // Calculate column widths
   const provWidth = Math.max(
-    "PROVISIONER".length,
+    "Provisioner".length,
     ...extensions.map((e) => e.provisioner.length)
   );
   const statusWidth = 10;
@@ -37,16 +38,16 @@ export function ExtensionTable({ extensions }: ExtensionTableProps) {
         <Box key={extName} flexDirection="column" marginTop={idx > 0 ? 1 : 0}>
           {/* Extension header */}
           <Box>
-            <Text bold color="cyan">{extName}/</Text>
+            <Text bold color={colors.ui.highlight}>{extName}/</Text>
           </Box>
 
           {/* Header row */}
           <Box marginLeft={2}>
             <Box width={provWidth + 2}>
-              <Text bold color="whiteBright">Provisioner</Text>
+              <Text bold color={colors.table.header}>Provisioner</Text>
             </Box>
             <Box width={statusWidth + 2}>
-              <Text bold color="whiteBright">Status</Text>
+              <Text bold color={colors.table.header}>Status</Text>
             </Box>
           </Box>
 
@@ -54,13 +55,13 @@ export function ExtensionTable({ extensions }: ExtensionTableProps) {
           {provs.map((prov) => (
             <Box key={prov.provisioner} marginLeft={2}>
               <Box width={provWidth + 2}>
-                <Text color="white">{prov.provisioner}</Text>
+                <Text color={colors.table.rowPrimary}>{prov.provisioner}</Text>
               </Box>
               <Box width={statusWidth + 2}>
                 {prov.enabled ? (
-                  <Text color="green">enabled</Text>
+                  <Text color={colors.status.enabled}>enabled</Text>
                 ) : (
-                  <Text color="gray">disabled</Text>
+                  <Text color={colors.status.disabled}>disabled</Text>
                 )}
               </Box>
             </Box>
@@ -70,7 +71,7 @@ export function ExtensionTable({ extensions }: ExtensionTableProps) {
 
       {/* Summary */}
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text color={colors.text.muted}>
           {extensions.filter((e) => e.enabled).length} enabled, {extensions.filter((e) => !e.enabled).length} disabled
         </Text>
       </Box>

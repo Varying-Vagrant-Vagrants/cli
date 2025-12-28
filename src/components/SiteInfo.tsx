@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, Box } from "ink";
+import { colors } from "../utils/theme.js";
 
 interface SiteInfoProps {
   name: string;
@@ -19,18 +20,18 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">{name}</Text>
+        <Text bold color={colors.ui.highlight}>{name}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Status</Text>
+          <Text bold color={colors.ui.label}>Status</Text>
         </Box>
         <Box>
           {site.skip_provisioning ? (
-            <Text color="gray">disabled</Text>
+            <Text color={colors.status.disabled}>disabled</Text>
           ) : (
-            <Text color="green">enabled</Text>
+            <Text color={colors.status.enabled}>enabled</Text>
           )}
         </Box>
       </Box>
@@ -38,10 +39,10 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
       {site.description && (
         <Box>
           <Box width={labelWidth}>
-            <Text bold color="whiteBright">Description</Text>
+            <Text bold color={colors.ui.label}>Description</Text>
           </Box>
           <Box>
-            <Text>{site.description}</Text>
+            <Text color={colors.text.primary}>{site.description}</Text>
           </Box>
         </Box>
       )}
@@ -49,10 +50,10 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
       {site.repo && (
         <Box>
           <Box width={labelWidth}>
-            <Text bold color="whiteBright">Repository</Text>
+            <Text bold color={colors.ui.label}>Repository</Text>
           </Box>
           <Box>
-            <Text color="blue">{site.repo}</Text>
+            <Text color={colors.data.hostname}>{site.repo}</Text>
           </Box>
         </Box>
       )}
@@ -60,10 +61,10 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
       {site.php && (
         <Box>
           <Box width={labelWidth}>
-            <Text bold color="whiteBright">PHP Version</Text>
+            <Text bold color={colors.ui.label}>PHP Version</Text>
           </Box>
           <Box>
-            <Text color="magenta">{site.php}</Text>
+            <Text color={colors.data.version}>{site.php}</Text>
           </Box>
         </Box>
       )}
@@ -71,11 +72,11 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
       {site.hosts && site.hosts.length > 0 && (
         <Box>
           <Box width={labelWidth}>
-            <Text bold color="whiteBright">Hosts</Text>
+            <Text bold color={colors.ui.label}>Hosts</Text>
           </Box>
           <Box flexDirection="column">
             {site.hosts.map((host, i) => (
-              <Text key={i} color="blue">{host}</Text>
+              <Text key={i} color={colors.data.hostname}>{host}</Text>
             ))}
           </Box>
         </Box>
@@ -83,15 +84,15 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
 
       {site.custom && Object.keys(site.custom).length > 0 && (
         <Box marginTop={1} flexDirection="column">
-          <Text bold color="whiteBright">Custom Settings</Text>
+          <Text bold color={colors.ui.label}>Custom Settings</Text>
           <Box marginLeft={2} flexDirection="column">
             {Object.entries(site.custom).map(([key, value]) => (
               <Box key={key}>
                 <Box width={24}>
-                  <Text color="gray">{key}</Text>
+                  <Text color={colors.text.secondary}>{key}</Text>
                 </Box>
                 <Box>
-                  <Text>{formatValue(value)}</Text>
+                  <Text color={colors.text.primary}>{formatValue(value)}</Text>
                 </Box>
               </Box>
             ))}

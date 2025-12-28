@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, Box } from "ink";
+import { colors } from "../utils/theme.js";
 
 interface SystemInfoProps {
   vvvVersion: string;
@@ -44,74 +45,74 @@ export function SystemInfo({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">System Information</Text>
+        <Text bold color={colors.ui.highlight}>System Information</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">VVV Version</Text>
+          <Text bold color={colors.ui.label}>VVV Version</Text>
         </Box>
-        <Text color={isUpToDate ? "green" : "yellow"}>{vvvVersion}</Text>
+        <Text color={isUpToDate ? colors.status.success : colors.status.warning}>{vvvVersion}</Text>
         {latestVersion && !isUpToDate && (
-          <Text color="gray"> (update available: {latestVersion})</Text>
+          <Text color={colors.text.secondary}> (update available: {latestVersion})</Text>
         )}
         {isNewer && (
-          <Text color="gray"> (ahead of release)</Text>
+          <Text color={colors.text.secondary}> (ahead of release)</Text>
         )}
         {isUpToDate && latestVersion && !isNewer && (
-          <Text color="gray"> (up to date)</Text>
+          <Text color={colors.text.secondary}> (up to date)</Text>
         )}
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">VVV Path</Text>
+          <Text bold color={colors.ui.label}>VVV Path</Text>
         </Box>
-        <Text color="blue">{vvvPath}</Text>
+        <Text color={colors.data.path}>{vvvPath}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Install Type</Text>
+          <Text bold color={colors.ui.label}>Install Type</Text>
         </Box>
         <Text>
           {gitInstall ? (
             <>
-              <Text color="green">git clone</Text>
-              {gitBranch && <Text color="gray"> ({gitBranch})</Text>}
+              <Text color={colors.status.success}>git clone</Text>
+              {gitBranch && <Text color={colors.text.secondary}> ({gitBranch})</Text>}
             </>
           ) : (
-            <Text color="gray">release</Text>
+            <Text color={colors.text.secondary}>release</Text>
           )}
         </Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Vagrant</Text>
+          <Text bold color={colors.ui.label}>Vagrant</Text>
         </Box>
-        <Text>{vagrantVersion}</Text>
+        <Text color={colors.data.value}>{vagrantVersion}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Provider</Text>
+          <Text bold color={colors.ui.label}>Provider</Text>
         </Box>
-        <Text color="magenta">{provider}</Text>
+        <Text color={colors.data.name}>{provider}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">Architecture</Text>
+          <Text bold color={colors.ui.label}>Architecture</Text>
         </Box>
-        <Text>{arch}</Text>
+        <Text color={colors.data.value}>{arch}</Text>
       </Box>
 
       <Box>
         <Box width={labelWidth}>
-          <Text bold color="whiteBright">OS</Text>
+          <Text bold color={colors.ui.label}>OS</Text>
         </Box>
-        <Text>{os}</Text>
+        <Text color={colors.data.value}>{os}</Text>
       </Box>
     </Box>
   );
