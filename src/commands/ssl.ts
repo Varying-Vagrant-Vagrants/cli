@@ -156,35 +156,66 @@ const listCommand = new Command("list")
     console.log("");
   });
 
-// Trust subcommand
-const trustCommand = new Command("trust")
-  .description("Trust the VVV CA certificate in system keychain")
+// Status subcommand
+const statusCommand = new Command("status")
+  .description("Check CA certificate status")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
-  .option("--status", "Check if CA is already trusted")
   .option("--json", "Output as JSON")
   .action((options) => {
     const vvvPath = options.path;
 
-    // Status check mode
-    if (options.status) {
-      const trusted = isCaTrusted();
+    ensureVvvExists(vvvPath);
 
-      if (options.json) {
-        console.log(JSON.stringify({ trusted, platform: platform() }, null, 2));
-        return;
-      }
+    const caPath = getCaPath(vvvPath);
+    const caExists = existsSync(caPath);
+    const trusted = caExists ? isCaTrusted() : false;
 
+    if (options.json) {
+      console.log(JSON.stringify({
+        ca: {
+          exists: caExists,
+          path: caPath,
+          trusted,
+        },
+        platform: platform(),
+      }, null, 2));
+      return;
+    }
+
+    console.log("");
+    cli.bold("SSL CA Status");
+    console.log("");
+
+    // CA exists check
+    if (caExists) {
+      cli.success(`CA certificate exists: ${cli.format.dim(caPath)}`);
+    } else {
+      cli.error(`CA certificate not found: ${cli.format.dim(caPath)}`);
       console.log("");
-      if (trusted) {
-        cli.success("VVV CA certificate is trusted.");
-      } else {
-        cli.warning("VVV CA certificate is NOT trusted.");
-        console.log("");
-        console.log("Run 'vvvlocal ssl trust' to trust it.");
-      }
+      console.log("Run 'vagrant provision' to generate the CA certificate.");
       console.log("");
       return;
     }
+
+    // Trusted check
+    if (trusted) {
+      cli.success("CA certificate is trusted in system keychain.");
+    } else {
+      cli.warning("CA certificate is NOT trusted in system keychain.");
+      console.log("");
+      console.log("Run 'vvvlocal ssl trust' to trust it.");
+    }
+
+    console.log("");
+  });
+
+// Trust subcommand
+const trustCommand = new Command("trust")
+  .description("Trust the VVV CA certificate in system keychain")
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("--json", "Output as JSON")
+  .action((options) => {
+    const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
 
@@ -255,4 +286,5 @@ const trustCommand = new Command("trust")
 export const sslCommand = new Command("ssl")
   .description("Manage SSL certificates")
   .addCommand(listCommand)
+  .addCommand(statusCommand)
   .addCommand(trustCommand);
