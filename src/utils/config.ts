@@ -136,3 +136,76 @@ export function disableExtension(
 
   writeFileSync(configPath, doc.toString(), "utf-8");
 }
+
+export interface SiteUpdateOptions {
+  description?: string;
+  php?: string;
+  addHosts?: string[];
+  removeHosts?: string[];
+}
+
+/**
+ * Update a site's configuration.
+ * Only updates fields that are provided in the options.
+ */
+export function updateSiteConfig(
+  vvvPath: string,
+  siteName: string,
+  options: SiteUpdateOptions
+): void {
+  const configPath = getConfigPath(vvvPath);
+  const content = readFileSync(configPath, "utf-8");
+  const doc = parseDocument(content);
+
+  const sites = doc.get("sites") as any;
+  if (!sites) {
+    throw new Error("No sites found in config");
+  }
+
+  const site = sites.get(siteName);
+  if (!site) {
+    throw new Error(`Site '${siteName}' not found in config`);
+  }
+
+  // Update description if provided
+  if (options.description !== undefined) {
+    site.set("description", options.description);
+  }
+
+  // Update PHP version if provided
+  if (options.php !== undefined) {
+    site.set("php", options.php);
+  }
+
+  // Handle hosts modifications
+  if (options.addHosts?.length || options.removeHosts?.length) {
+    const hosts = site.get("hosts");
+
+    // Get current hosts as array
+    let currentHosts: string[] = [];
+    if (hosts && hosts.items) {
+      currentHosts = hosts.items.map((item: any) => item.value);
+    }
+
+    // Remove hosts
+    if (options.removeHosts?.length) {
+      currentHosts = currentHosts.filter(
+        (h: string) => !options.removeHosts?.includes(h)
+      );
+    }
+
+    // Add new hosts (avoid duplicates)
+    if (options.addHosts?.length) {
+      for (const host of options.addHosts) {
+        if (!currentHosts.includes(host)) {
+          currentHosts.push(host);
+        }
+      }
+    }
+
+    // Update the hosts array
+    site.set("hosts", currentHosts);
+  }
+
+  writeFileSync(configPath, doc.toString(), "utf-8");
+}
