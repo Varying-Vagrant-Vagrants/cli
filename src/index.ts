@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, installCommand, upgradeCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {
@@ -30,7 +30,7 @@ ${red} \\_/${green}\\_/${blue}\\_/${reset}   CLI for VVV
 const commandGroups = [
   {
     name: "VM Management",
-    commands: ["up", "stop", "restart", "status", "ssh", "reprovision", "destroy"],
+    commands: ["up", "stop", "restart", "status", "ssh", "exec", "reprovision", "destroy"],
   },
   {
     name: "Site Management",
@@ -45,8 +45,12 @@ const commandGroups = [
     commands: ["database"],
   },
   {
+    name: "PHP",
+    commands: ["php"],
+  },
+  {
     name: "System",
-    commands: ["info", "install", "upgrade"],
+    commands: ["info", "install", "providers", "upgrade"],
   },
 ];
 
@@ -145,9 +149,12 @@ program.helpInformation = function() {
 
 program.addCommand(databaseCommand);
 program.addCommand(destroyCommand);
+program.addCommand(execCommand);
 program.addCommand(extensionCommand);
 program.addCommand(infoCommand);
 program.addCommand(installCommand);
+program.addCommand(phpCommand);
+program.addCommand(providersCommand);
 program.addCommand(reprovisionCommand);
 program.addCommand(restartCommand);
 program.addCommand(siteCommand);
