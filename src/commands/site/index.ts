@@ -7,6 +7,7 @@ import { enableCommand } from "./enable.js";
 import { disableCommand } from "./disable.js";
 import { openCommand } from "./open.js";
 import { updateCommand } from "./update.js";
+import { wpCommand } from "./wp.js";
 
 export const siteCommand = new Command("site")
   .description("Manage VVV sites")
@@ -17,4 +18,5 @@ export const siteCommand = new Command("site")
   .addCommand(listCommand)
   .addCommand(openCommand)
   .addCommand(removeCommand)
-  .addCommand(updateCommand);
+  .addCommand(updateCommand)
+  .addCommand(wpCommand);

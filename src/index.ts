@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, openCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {
@@ -30,11 +30,11 @@ ${red} \\_/${green}\\_/${blue}\\_/${reset}   CLI for VVV
 const commandGroups = [
   {
     name: "VM Management",
-    commands: ["up", "stop", "restart", "status", "ssh", "exec", "reprovision", "destroy"],
+    commands: ["up", "stop", "restart", "status", "ssh", "exec", "reprovision", "destroy", "snapshot"],
   },
   {
     name: "Site Management",
-    commands: ["site", "open"],
+    commands: ["site", "open", "wp"],
   },
   {
     name: "Extension Management",
@@ -50,7 +50,7 @@ const commandGroups = [
   },
   {
     name: "System",
-    commands: ["config", "info", "install", "providers", "upgrade"],
+    commands: ["config", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
   },
 ];
 
@@ -154,17 +154,22 @@ program.addCommand(execCommand);
 program.addCommand(extensionCommand);
 program.addCommand(infoCommand);
 program.addCommand(installCommand);
+program.addCommand(logsCommand);
 program.addCommand(openCommand);
 program.addCommand(phpCommand);
 program.addCommand(providersCommand);
 program.addCommand(reprovisionCommand);
 program.addCommand(restartCommand);
+program.addCommand(serviceCommand);
 program.addCommand(siteCommand);
+program.addCommand(snapshotCommand);
 program.addCommand(sshCommand);
+program.addCommand(sslCommand);
 program.addCommand(statusCommand);
 program.addCommand(stopCommand);
 program.addCommand(upCommand);
 program.addCommand(upgradeCommand);
+program.addCommand(wpCommand);
 program.addCommand(xdebugCommand);
 
 program.parse();
