@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
-import { loadConfig, vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { loadConfig, vvvExists, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { SiteTable } from "../../components/SiteTable.js";
 
 export const listCommand = new Command("list")
@@ -38,7 +38,7 @@ export const listCommand = new Command("list")
           description: site.description,
           php: site.php,
           skipped: site.skip_provisioning === true,
-          path: `${vvvPath}/www/${name}`,
+          path: getSiteLocalPath(vvvPath, name, site),
         }));
 
       if (options.json) {

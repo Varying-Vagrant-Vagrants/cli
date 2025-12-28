@@ -18,7 +18,25 @@ export interface SiteConfig {
   hosts?: string[];
   skip_provisioning?: boolean;
   php?: string;
+  local_dir?: string;
+  vm_dir?: string;
   custom?: Record<string, unknown>;
+}
+
+/**
+ * Get the local filesystem path for a site.
+ * Uses local_dir if specified, otherwise defaults to {vvvPath}/www/{siteName}
+ */
+export function getSiteLocalPath(vvvPath: string, siteName: string, site: SiteConfig): string {
+  return site.local_dir || join(vvvPath, "www", siteName);
+}
+
+/**
+ * Get the VM path for a site.
+ * Uses vm_dir if specified, otherwise defaults to /srv/www/{siteName}
+ */
+export function getSiteVmPath(siteName: string, site: SiteConfig): string {
+  return site.vm_dir || `/srv/www/${siteName}`;
 }
 
 export function getConfigPath(vvvPath: string): string {

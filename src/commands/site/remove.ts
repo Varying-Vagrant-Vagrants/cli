@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createInterface } from "readline";
 import { readFileSync, writeFileSync } from "fs";
 import { parseDocument } from "yaml";
-import { vvvExists, loadConfig, getConfigPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { vvvExists, loadConfig, getConfigPath, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
 
 function askQuestion(question: string): Promise<string> {
   const rl = createInterface({
@@ -60,11 +60,14 @@ export const removeCommand = new Command("remove")
       process.exit(1);
     }
 
-    // Check if site exists
-    if (!siteExists(vvvPath, name)) {
+    // Check if site exists and get its config
+    const config = loadConfig(vvvPath);
+    if (!config.sites || !config.sites[name]) {
       console.error(`Site '${name}' does not exist.`);
       process.exit(1);
     }
+    const siteConfig = config.sites[name];
+    const sitePath = getSiteLocalPath(vvvPath, name, siteConfig);
 
     // Confirm removal unless --force is used
     if (!options.force) {
@@ -91,7 +94,7 @@ export const removeCommand = new Command("remove")
       console.log("Run \x1b[1mvvvlocal reprovision\x1b[0m to update the VM.");
       console.log("");
       console.log("To completely remove the site:");
-      console.log(`  Files:    ${vvvPath}/www/${name}`);
+      console.log(`  Files:    ${sitePath}`);
       console.log("  Database: use \x1b[1mvvvlocal db list\x1b[0m to find and manually remove any databases");
     } catch (error) {
       console.error(`Failed to remove site: ${error}`);

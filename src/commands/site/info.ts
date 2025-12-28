@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
-import { loadConfig, vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { loadConfig, vvvExists, getSiteLocalPath, getSiteVmPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { SiteInfo } from "../../components/SiteInfo.js";
 
 export const infoCommand = new Command("info")
@@ -27,13 +27,15 @@ export const infoCommand = new Command("info")
       }
 
       const site = sites[name];
+      const localPath = getSiteLocalPath(vvvPath, name, site);
+      const vmPath = getSiteVmPath(name, site);
 
       if (options.json) {
-        console.log(JSON.stringify({ name, ...site }, null, 2));
+        console.log(JSON.stringify({ name, ...site, localPath, vmPath }, null, 2));
         return;
       }
 
-      render(React.createElement(SiteInfo, { name, site }));
+      render(React.createElement(SiteInfo, { name, site, localPath, vmPath }));
     } catch (error) {
       console.error(`Error reading config: ${(error as Error).message}`);
       process.exit(1);

@@ -36,6 +36,8 @@ function addSiteToConfig(
     description?: string;
     repo?: string;
     hosts: string[];
+    localDir?: string;
+    vmDir?: string;
   }
 ): void {
   const configPath = getConfigPath(vvvPath);
@@ -59,6 +61,12 @@ function addSiteToConfig(
     siteConfig.repo = options.repo;
   }
 
+  // Custom paths - both must be specified together
+  if (options.localDir && options.vmDir) {
+    siteConfig.local_dir = options.localDir;
+    siteConfig.vm_dir = options.vmDir;
+  }
+
   siteConfig.hosts = options.hosts;
   siteConfig.skip_provisioning = false;
 
@@ -75,6 +83,8 @@ export const addCommand = new Command("add")
   .option("-d, --description <description>", "Site description")
   .option("-r, --repo <repo>", "Git repository URL for custom site template")
   .option("-H, --host <hosts...>", "Hostnames for the site (can specify multiple)")
+  .option("--local-dir <path>", "Custom local directory path (requires --vm-dir)")
+  .option("--vm-dir <path>", "Custom VM directory path (requires --local-dir)")
   .option("-y, --yes", "Skip interactive prompts and use defaults")
   .action(async (name, options) => {
     const vvvPath = options.path;
@@ -87,6 +97,14 @@ export const addCommand = new Command("add")
     // Check for duplicate site
     if (siteExists(vvvPath, name)) {
       console.error(`Site '${name}' already exists.`);
+      process.exit(1);
+    }
+
+    // Validate custom paths - both must be specified together
+    const localDir = options.localDir;
+    const vmDir = options.vmDir;
+    if ((localDir && !vmDir) || (!localDir && vmDir)) {
+      console.error("Both --local-dir and --vm-dir must be specified together.");
       process.exit(1);
     }
 
@@ -133,6 +151,8 @@ export const addCommand = new Command("add")
         description: description || undefined,
         repo,
         hosts,
+        localDir,
+        vmDir,
       });
 
       console.log(`\nSite '${name}' added successfully!`);
@@ -144,6 +164,10 @@ export const addCommand = new Command("add")
       }
       if (repo) {
         console.log(`  Repo: ${repo}`);
+      }
+      if (localDir && vmDir) {
+        console.log(`  Local path: ${localDir}`);
+        console.log(`  VM path: ${vmDir}`);
       }
       console.log("");
       console.log("\x1b[33mNote:\x1b[0m Run \x1b[1mvvvlocal reprovision\x1b[0m to create the site.");

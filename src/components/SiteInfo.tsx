@@ -10,11 +10,15 @@ interface SiteInfoProps {
     hosts?: string[];
     skip_provisioning?: boolean;
     php?: string | number;
+    local_dir?: string;
+    vm_dir?: string;
     custom?: Record<string, unknown>;
   };
+  localPath: string;
+  vmPath: string;
 }
 
-export function SiteInfo({ name, site }: SiteInfoProps) {
+export function SiteInfo({ name, site, localPath, vmPath }: SiteInfoProps) {
   const labelWidth = 14;
 
   return (
@@ -68,6 +72,24 @@ export function SiteInfo({ name, site }: SiteInfoProps) {
           </Box>
         </Box>
       )}
+
+      <Box>
+        <Box width={labelWidth}>
+          <Text bold color={colors.ui.label}>Local Path</Text>
+        </Box>
+        <Box>
+          <Text color={colors.data.path}>{localPath}</Text>
+        </Box>
+      </Box>
+
+      <Box>
+        <Box width={labelWidth}>
+          <Text bold color={colors.ui.label}>VM Path</Text>
+        </Box>
+        <Box>
+          <Text color={colors.data.path}>{vmPath}</Text>
+        </Box>
+      </Box>
 
       {site.hosts && site.hosts.length > 0 && (
         <Box>
