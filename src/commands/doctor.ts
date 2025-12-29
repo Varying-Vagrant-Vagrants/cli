@@ -1,11 +1,69 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
-import { existsSync } from "fs";
-import { resolve } from "path";
+import { existsSync, readFileSync } from "fs";
+import { resolve, join } from "path";
 import { DEFAULT_VVV_PATH, loadConfig, getConfigPath, vvvExists } from "../utils/config.js";
 import { cli, isVerbose, verbose } from "../utils/cli.js";
 import { isVagrantInstalled, vagrantSshSync, vagrantRunSync } from "../utils/vagrant.js";
-import { detectAvailableProvidersAsync, getCurrentProvider, PROVIDERS } from "../utils/providers.js";
+import { detectAvailableProvidersAsync, getCurrentProvider } from "../utils/providers.js";
+import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
+
+// VVV version helpers
+function getVVVVersion(vvvPath: string): string {
+  const versionFile = join(vvvPath, "version");
+  if (existsSync(versionFile)) {
+    return readFileSync(versionFile, "utf-8").trim();
+  }
+  return "unknown";
+}
+
+function isGitInstall(vvvPath: string): boolean {
+  return existsSync(join(vvvPath, ".git"));
+}
+
+function getGitBranch(vvvPath: string): string | null {
+  if (!isGitInstall(vvvPath)) {
+    return null;
+  }
+  const result = spawnSync("git", ["branch", "--show-current"], {
+    cwd: vvvPath,
+    encoding: "utf-8",
+    timeout: 5000,
+  });
+  if (result.status === 0) {
+    return result.stdout.trim();
+  }
+  return null;
+}
+
+async function getLatestVVVVersion(): Promise<string | null> {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/Varying-Vagrant-Vagrants/VVV/releases/latest",
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (response.ok) {
+      const data = await response.json() as { tag_name?: string };
+      return data.tag_name?.replace(/^v/, "") || null;
+    }
+  } catch {
+    // Network error, ignore
+  }
+  return null;
+}
+
+function compareVersions(current: string, latest: string): number {
+  const currentParts = current.split(".").map(Number);
+  const latestParts = latest.split(".").map(Number);
+
+  for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+    const c = currentParts[i] || 0;
+    const l = latestParts[i] || 0;
+    if (c < l) return -1;
+    if (c > l) return 1;
+  }
+  return 0;
+}
 
 // Check result types
 interface CheckResult {
@@ -88,6 +146,8 @@ async function checkPrerequisites(ctx: CheckContext): Promise<CheckResult[]> {
     const dockerInfo = spawnSync("docker", ["info"], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
     if (dockerInfo.status === 0) {
       results.push(pass("Docker running", category, "Docker daemon is running"));
+      // Port conflict checks are done later after we know VM state
+      // (we skip them if VVV is running since it legitimately uses those ports)
     } else {
       results.push(fail("Docker running", category, "Docker is installed but not running", "Start Docker Desktop or the Docker daemon"));
     }
@@ -155,7 +215,7 @@ async function checkPrerequisites(ctx: CheckContext): Promise<CheckResult[]> {
 // VVV INSTALLATION CHECKS
 // =============================================================================
 
-function checkVvvInstallation(ctx: CheckContext): CheckResult[] {
+async function checkVvvInstallation(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "VVV Installation";
 
@@ -165,6 +225,35 @@ function checkVvvInstallation(ctx: CheckContext): CheckResult[] {
   } else {
     results.push(fail("VVV directory", category, `VVV not found at ${ctx.vvvPath}`, "Run: vvvlocal install"));
     return results; // Can't check anything else
+  }
+
+  // Check VVV version
+  const currentVersion = getVVVVersion(ctx.vvvPath);
+  const isGit = isGitInstall(ctx.vvvPath);
+  const gitBranch = isGit ? getGitBranch(ctx.vvvPath) : null;
+
+  if (currentVersion !== "unknown") {
+    // Fetch latest version in background
+    const latestVersion = await getLatestVVVVersion();
+
+    if (latestVersion) {
+      const comparison = compareVersions(currentVersion, latestVersion);
+      if (comparison < 0) {
+        const versionInfo = gitBranch ? `${currentVersion} (${gitBranch})` : currentVersion;
+        results.push(warn("VVV version", category,
+          `VVV ${versionInfo} - update available: ${latestVersion}`,
+          isGit ? "Run: vvvlocal upgrade" : "Download latest from https://varyingvagrantvagrants.org/"));
+      } else {
+        const versionInfo = gitBranch ? `${currentVersion} (${gitBranch})` : currentVersion;
+        results.push(pass("VVV version", category, `VVV ${versionInfo} (latest)`));
+      }
+    } else {
+      // Couldn't fetch latest, just show current
+      const versionInfo = gitBranch ? `${currentVersion} (${gitBranch})` : currentVersion;
+      results.push(pass("VVV version", category, `VVV ${versionInfo}`));
+    }
+  } else {
+    results.push(warn("VVV version", category, "Could not determine VVV version"));
   }
 
   // Check Vagrantfile
@@ -298,13 +387,20 @@ function checkServices(ctx: CheckContext): CheckResult[] {
   }
 
   // Check Memcached (warn only)
+  // Uses pgrep fallback since service script may not detect manually started processes
   const memcachedResult = vagrantSshSync("sudo service memcached status 2>&1", ctx.vvvPath);
   if (memcachedResult.stdout?.includes("is running")) {
     results.push(pass("Memcached", category, "Memcached is running"));
   } else if (memcachedResult.stdout?.includes("unrecognized service")) {
     results.push(skip("Memcached", category, "Memcached not installed"));
   } else {
-    results.push(warn("Memcached", category, "Memcached is not running (optional)", "Run: vvvlocal service start memcached"));
+    // Fallback: check if process is actually running
+    const pgrepResult = vagrantSshSync("pgrep -x memcached >/dev/null && echo running || echo stopped", ctx.vvvPath);
+    if (pgrepResult.stdout?.includes("running")) {
+      results.push(pass("Memcached", category, "Memcached is running"));
+    } else {
+      results.push(warn("Memcached", category, "Memcached is not running (optional)", "Run: vvvlocal service start memcached"));
+    }
   }
 
   return results;
@@ -550,11 +646,35 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
 
   // Phase 2: VVV Installation (can run without VM)
   verbose("Checking VVV installation...");
-  results.push(...checkVvvInstallation(ctx));
+  results.push(...await checkVvvInstallation(ctx));
 
   // Phase 3: VM State (determines if we can continue)
   verbose("Checking VM state...");
   results.push(...checkVmState(ctx));
+
+  // Check for port conflicts when using Docker and VM is NOT running
+  // (if VM is running, it's using those ports legitimately)
+  if (!ctx.vmRunning && ctx.provider === "docker") {
+    const category = "Prerequisites";
+    const portConflicts = checkPortConflicts(VVV_PORTS);
+
+    for (const conflict of portConflicts) {
+      results.push(fail(
+        `Port ${conflict.port} available`,
+        category,
+        `Port ${conflict.port} (${conflict.service}) is in use by ${conflict.process}`,
+        conflict.suggestion
+      ));
+    }
+
+    // Show pass for ports that are available
+    for (const port of VVV_PORTS) {
+      if (!portConflicts.find(c => c.port === port)) {
+        const service = port === 80 ? "HTTP" : port === 443 ? "HTTPS" : port === 3306 ? "MySQL" : `Port ${port}`;
+        results.push(pass(`Port ${port} available`, category, `Port ${port} (${service}) is available`));
+      }
+    }
+  }
 
   // Fail fast if VM not running
   if (!ctx.vmRunning) {
