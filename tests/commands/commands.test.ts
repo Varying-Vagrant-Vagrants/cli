@@ -95,8 +95,10 @@ describe("VM Management Commands", () => {
     test("requires command argument", () => {
       const args = execCommand.registeredArguments;
       expect(args.length).toBeGreaterThan(0);
-      expect(args[0].name()).toBe("command");
-      expect(args[0].required).toBe(true);
+      const firstArg = args[0];
+      expect(firstArg).toBeDefined();
+      expect(firstArg!.name()).toBe("command");
+      expect(firstArg!.required).toBe(true);
     });
   });
 });
@@ -137,7 +139,9 @@ describe("System Commands", () => {
     test("requires shell argument", () => {
       const args = completionCommand.registeredArguments;
       expect(args.length).toBeGreaterThan(0);
-      expect(args[0].name()).toBe("shell");
+      const firstArg = args[0];
+      expect(firstArg).toBeDefined();
+      expect(firstArg!.name()).toBe("shell");
     });
   });
 });

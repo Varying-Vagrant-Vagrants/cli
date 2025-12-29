@@ -44,7 +44,9 @@ describe("Site Command Group", () => {
     test("requires site name argument", () => {
       const args = infoCmd?.registeredArguments || [];
       expect(args.length).toBeGreaterThan(0);
-      expect(args[0].name()).toBe("name");
+      const firstArg = args[0];
+      expect(firstArg).toBeDefined();
+      expect(firstArg!.name()).toBe("name");
     });
 
     test("has --json option", () => {
@@ -67,7 +69,9 @@ describe("Site Command Group", () => {
     test("requires site name argument", () => {
       const args = addCmd?.registeredArguments || [];
       expect(args.length).toBeGreaterThan(0);
-      expect(args[0].name()).toBe("name");
+      const firstArg = args[0];
+      expect(firstArg).toBeDefined();
+      expect(firstArg!.name()).toBe("name");
     });
 
     test("has --host option", () => {
