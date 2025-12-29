@@ -3,26 +3,90 @@ import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { ensureVvvExists, ensureVvvRunning, cli, exitWithError, verbose, startTimer } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantSsh, vagrantSshSync } from "../utils/vagrant.js";
 
-// Service name mapping
-const SERVICES: Record<string, string | null> = {
+// Service name mapping (non-PHP services)
+const CORE_SERVICES: Record<string, string> = {
   nginx: "nginx",
-  php: null, // Detected dynamically
   mysql: "mariadb",
   mariadb: "mariadb",
   memcached: "memcached",
 };
 
-const VALID_SERVICES = Object.keys(SERVICES);
-const VALID_ACTIONS = ["restart", "start", "stop", "status"];
+// Base valid services - PHP versions are detected dynamically
+const BASE_VALID_SERVICES = [...Object.keys(CORE_SERVICES), "php"];
+
+/**
+ * Check if a service name is valid (either a core service or a PHP version pattern).
+ */
+function isValidService(service: string): boolean {
+  // Core services
+  if (BASE_VALID_SERVICES.includes(service)) {
+    return true;
+  }
+  // PHP version pattern like "php8.2" or "php7.4"
+  if (/^php\d+\.\d+$/.test(service)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Get help text for valid service names.
+ */
+function getValidServicesHelp(): string {
+  return "nginx, mysql, mariadb, memcached, php, php<version> (e.g., php8.2)";
+}
+
+/**
+ * Get installed PHP-FPM versions by checking systemd services.
+ * Returns an array of version strings like ["7.4", "8.0", "8.2"]
+ */
+function getInstalledPhpVersions(vvvPath: string): string[] {
+  // List all php*-fpm services that exist
+  const result = vagrantSshSync(
+    "systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}'",
+    vvvPath
+  );
+
+  if (result.status !== 0) {
+    verbose(`Failed to list PHP services: ${result.stderr}`);
+    return [];
+  }
+
+  // Filter out banner lines and parse version numbers
+  const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
+  const versions: string[] = [];
+
+  for (const line of result.stdout.trim().split("\n")) {
+    if (boxChars.test(line) || line.trim() === "") {
+      continue;
+    }
+    // Parse "php8.2-fpm.service" -> "8.2"
+    const match = line.match(/php(\d+\.\d+)-fpm\.service/);
+    if (match && match[1]) {
+      versions.push(match[1]);
+    }
+  }
+
+  verbose(`Found PHP versions: ${versions.join(", ")}`);
+  return versions.sort();
+}
 
 /**
  * Get the PHP-FPM service name based on active PHP version.
  */
 function getPhpServiceName(vvvPath: string): string {
   const result = vagrantSshSync("php -v 2>/dev/null | head -1", vvvPath);
-  const match = result.stdout.match(/PHP (\d+)\.(\d+)/);
-  if (match) {
-    return `php${match[1]}.${match[2]}-fpm`;
+  // Filter out VVV banner
+  const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
+  const lines = result.stdout.trim().split("\n").filter((line) => {
+    return line.trim() !== "" && !boxChars.test(line);
+  });
+
+  for (const line of lines) {
+    const match = line.match(/PHP (\d+)\.(\d+)/);
+    if (match) {
+      return `php${match[1]}.${match[2]}-fpm`;
+    }
   }
   return "php8.2-fpm"; // Default fallback
 }
@@ -31,10 +95,16 @@ function getPhpServiceName(vvvPath: string): string {
  * Get the actual systemd service name.
  */
 function getServiceName(service: string, vvvPath: string): string {
+  // Handle "php" as alias for current default PHP
   if (service === "php") {
     return getPhpServiceName(vvvPath);
   }
-  return SERVICES[service] || service;
+  // Handle specific PHP versions like "php8.2" -> "php8.2-fpm"
+  const phpMatch = service.match(/^php(\d+\.\d+)$/);
+  if (phpMatch) {
+    return `php${phpMatch[1]}-fpm`;
+  }
+  return CORE_SERVICES[service] || service;
 }
 
 /**
@@ -42,63 +112,99 @@ function getServiceName(service: string, vvvPath: string): string {
  */
 function getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
   const result = vagrantSshSync(`systemctl is-active ${serviceName} 2>/dev/null`, vvvPath);
-  const status = result.stdout.trim();
+  // Filter out VVV banner lines
+  const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
+  const lines = result.stdout.trim().split("\n").filter((line) => {
+    return line.trim() !== "" && !boxChars.test(line);
+  });
+  // The actual status should be the last non-banner line
+  const status = lines[lines.length - 1]?.trim() || "unknown";
   return {
     running: status === "active",
-    status: status || "unknown",
+    status,
   };
 }
 
 /**
- * Get status of all services using a single batched SSH call.
- * Much faster than calling getServiceStatus for each service individually.
+ * Get status of all services using batched SSH calls.
  */
-function getAllServicesStatus(vvvPath: string): Record<string, { name: string; running: boolean; status: string }> {
-  const statuses: Record<string, { name: string; running: boolean; status: string }> = {};
+function getAllServicesStatus(vvvPath: string): Record<string, { name: string; running: boolean; status: string; isDefault?: boolean }> {
+  const statuses: Record<string, { name: string; running: boolean; status: string; isDefault?: boolean }> = {};
 
-  // First, get PHP service name (requires one SSH call)
-  const phpServiceName = getPhpServiceName(vvvPath);
+  // Get installed PHP versions and default PHP version
+  const phpVersions = getInstalledPhpVersions(vvvPath);
+  const defaultPhpService = getPhpServiceName(vvvPath);
+  const defaultPhpVersion = defaultPhpService.match(/php(\d+\.\d+)-fpm/)?.[1] || "";
 
-  // Build a map of service names
-  const serviceNames: Record<string, string> = {};
-  for (const service of VALID_SERVICES) {
-    serviceNames[service] = service === "php" ? phpServiceName : (SERVICES[service] || service);
-  }
+  verbose(`Default PHP version: ${defaultPhpVersion}`);
+  verbose(`Installed PHP versions: ${phpVersions.join(", ")}`);
 
-  // Get all unique systemd service names
-  const uniqueNames = [...new Set(Object.values(serviceNames))];
+  // Build list of services to check
+  // Core services
+  const coreServiceList = ["nginx", "mariadb", "memcached"];
+  // All installed PHP-FPM versions
+  const phpServiceList = phpVersions.map(v => `php${v}-fpm`);
 
-  verbose(`Checking ${uniqueNames.length} services in a single SSH call...`);
+  const allServices = [...coreServiceList, ...phpServiceList];
+
+  verbose(`Checking ${allServices.length} services in a single SSH call...`);
   const getElapsed = startTimer();
 
   // Batch check: run systemctl is-active for all services in one SSH call
-  const command = uniqueNames
+  const command = allServices
     .map((name) => `echo "${name}:$(systemctl is-active ${name} 2>/dev/null || echo unknown)"`)
     .join(" && ");
 
   const result = vagrantSshSync(command, vvvPath);
 
   verbose(`Service status check completed (${getElapsed()})`);
+  verbose(`SSH exit code: ${result.status}`);
+  verbose(`SSH stdout length: ${result.stdout?.length || 0}`);
 
-  // Parse results
+  // Parse results, filtering out VVV banner (box-drawing characters)
+  const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
   const statusMap: Record<string, string> = {};
   if (result.status === 0) {
     for (const line of result.stdout.trim().split("\n")) {
-      const [name, status] = line.split(":");
-      if (name && status) {
-        statusMap[name.trim()] = status.trim();
+      // Skip banner lines
+      if (boxChars.test(line) || line.trim() === "") {
+        verbose(`Skipping banner line: ${line.substring(0, 50)}`);
+        continue;
+      }
+      const colonIndex = line.indexOf(":");
+      if (colonIndex > 0) {
+        const name = line.slice(0, colonIndex).trim();
+        const status = line.slice(colonIndex + 1).trim();
+        if (name && status) {
+          verbose(`Parsed service: ${name} = ${status}`);
+          statusMap[name] = status;
+        }
       }
     }
+  } else {
+    verbose(`SSH command failed: ${result.stderr}`);
   }
 
-  // Map back to our service structure
-  for (const service of VALID_SERVICES) {
-    const serviceName = serviceNames[service] || service;
-    const status = statusMap[serviceName] || "unknown";
+  // Build results for core services
+  for (const service of coreServiceList) {
+    const status = statusMap[service] || "unknown";
     statuses[service] = {
+      name: service,
+      running: status === "active",
+      status,
+    };
+  }
+
+  // Build results for PHP services
+  for (const version of phpVersions) {
+    const serviceName = `php${version}-fpm`;
+    const status = statusMap[serviceName] || "unknown";
+
+    statuses[`php${version}`] = {
       name: serviceName,
       running: status === "active",
       status,
+      isDefault: version === defaultPhpVersion,
     };
   }
 
@@ -129,17 +235,21 @@ const statusCommand = new Command("status")
     cli.bold("Service Status");
     console.log("");
 
-    const nameWidth = 12;
-    const serviceWidth = 20;
+    const nameWidth = 22;  // Accommodate "php8.2 (default)"
+    const serviceWidth = 16;
 
     console.log(`${"Service".padEnd(nameWidth)}${"Systemd Name".padEnd(serviceWidth)}Status`);
-    console.log("─".repeat(nameWidth + serviceWidth + 10));
+    console.log("─".repeat(nameWidth + serviceWidth + 12));
 
     for (const [service, info] of Object.entries(statuses)) {
+      // Show "(default)" indicator for the default PHP version
+      const defaultMarker = info.isDefault ? " (default)" : "";
+      const displayName = service + defaultMarker;
+
       const statusText = info.running
         ? cli.format.success("running")
         : cli.format.error(info.status);
-      console.log(`${service.padEnd(nameWidth)}${info.name.padEnd(serviceWidth)}${statusText}`);
+      console.log(`${displayName.padEnd(nameWidth)}${info.name.padEnd(serviceWidth)}${statusText}`);
     }
 
     console.log("");
@@ -148,18 +258,18 @@ const statusCommand = new Command("status")
 // Restart subcommand
 const restartCommand = new Command("restart")
   .description("Restart a service")
-  .argument("<service>", `Service to restart (${VALID_SERVICES.join(", ")})`)
+  .argument("<service>", `Service to restart (${getValidServicesHelp()})`)
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
   .action(async (service, options) => {
     const vvvPath = options.path;
 
-    if (!VALID_SERVICES.includes(service)) {
+    if (!isValidService(service)) {
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: `Invalid service: ${service}` }, null, 2));
         process.exit(1);
       }
-      exitWithError(`Invalid service: ${service}\nValid services: ${VALID_SERVICES.join(", ")}`);
+      exitWithError(`Invalid service: ${service}`, `Valid services: ${getValidServicesHelp()}`);
     }
 
     ensureVvvExists(vvvPath);
@@ -190,18 +300,18 @@ const restartCommand = new Command("restart")
 // Start subcommand
 const startCommand = new Command("start")
   .description("Start a service")
-  .argument("<service>", `Service to start (${VALID_SERVICES.join(", ")})`)
+  .argument("<service>", `Service to start (${getValidServicesHelp()})`)
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
   .action(async (service, options) => {
     const vvvPath = options.path;
 
-    if (!VALID_SERVICES.includes(service)) {
+    if (!isValidService(service)) {
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: `Invalid service: ${service}` }, null, 2));
         process.exit(1);
       }
-      exitWithError(`Invalid service: ${service}\nValid services: ${VALID_SERVICES.join(", ")}`);
+      exitWithError(`Invalid service: ${service}`, `Valid services: ${getValidServicesHelp()}`);
     }
 
     ensureVvvExists(vvvPath);
@@ -232,18 +342,18 @@ const startCommand = new Command("start")
 // Stop subcommand
 const stopCommand = new Command("stop")
   .description("Stop a service")
-  .argument("<service>", `Service to stop (${VALID_SERVICES.join(", ")})`)
+  .argument("<service>", `Service to stop (${getValidServicesHelp()})`)
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
   .action(async (service, options) => {
     const vvvPath = options.path;
 
-    if (!VALID_SERVICES.includes(service)) {
+    if (!isValidService(service)) {
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: `Invalid service: ${service}` }, null, 2));
         process.exit(1);
       }
-      exitWithError(`Invalid service: ${service}\nValid services: ${VALID_SERVICES.join(", ")}`);
+      exitWithError(`Invalid service: ${service}`, `Valid services: ${getValidServicesHelp()}`);
     }
 
     ensureVvvExists(vvvPath);
