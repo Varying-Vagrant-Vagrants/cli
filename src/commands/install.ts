@@ -186,7 +186,22 @@ export const installCommand = new Command("install")
 
     cli.success("VVV cloned successfully");
 
-    // Step 7: Copy default config
+    // Step 7: Install Vagrant plugins
+    console.log("\nInstalling Vagrant plugins...");
+    const pluginResult = spawnSync("vagrant", ["plugin", "install", "--local"], {
+      cwd: targetPath,
+      encoding: "utf-8",
+      stdio: "inherit",
+      timeout: 300000,
+    });
+
+    if (pluginResult.status === 0) {
+      cli.success("Vagrant plugins installed");
+    } else {
+      cli.warning("Failed to install Vagrant plugins. You may need to run 'vagrant plugin install --local' manually.");
+    }
+
+    // Step 8: Copy default config
     if (copyDefaultConfig(targetPath)) {
       cli.success("Default configuration created");
     }
