@@ -125,18 +125,18 @@ function getServiceName(service: string, vvvPath: string): string {
 
 /**
  * Get status of a single service.
- * Uses 'service' command instead of systemctl for Docker compatibility.
+ * Uses 'sudo service' command for proper permissions in Docker containers.
  */
 function getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
-  const result = vagrantSshSync(`service ${serviceName} status 2>&1`, vvvPath);
+  const result = vagrantSshSync(`sudo service ${serviceName} status 2>&1`, vvvPath);
   // Filter out VVV banner lines
   const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
   const lines = result.stdout.trim().split("\n").filter((line) => {
     return line.trim() !== "" && !boxChars.test(line);
   });
 
-  // Check if any line contains "is running"
-  const isRunning = lines.some((line) => line.includes("is running"));
+  // Check if any line contains "is running" or "Uptime" (MariaDB has different output)
+  const isRunning = lines.some((line) => line.includes("is running") || line.includes("Uptime"));
   return {
     running: isRunning,
     status: isRunning ? "active" : "inactive",
@@ -167,10 +167,13 @@ function getAllServicesStatus(vvvPath: string): Record<string, { name: string; r
   const getElapsed = startTimer();
 
   // Batch check: run service status for all services in one SSH call
-  // Use 'service' instead of 'systemctl' for Docker compatibility
+  // Use 'sudo service' for proper permissions in Docker containers
+  // Check for "is running" (most services) or "Uptime" (MariaDB has different output)
   // Output format: servicename:active|inactive|notfound
   const command = allServices
-    .map((name) => `output=$(service ${name} status 2>&1); if echo "$output" | grep -q "is running"; then echo "${name}:active"; elif echo "$output" | grep -q "unrecognized service"; then echo "${name}:notfound"; else echo "${name}:inactive"; fi`)
+    .map((name) => {
+      return `output=$(sudo service ${name} status 2>&1); if echo "$output" | grep -qE "is running|Uptime"; then echo "${name}:active"; elif echo "$output" | grep -q "unrecognized service"; then echo "${name}:notfound"; else echo "${name}:inactive"; fi`;
+    })
     .join("; ");
 
   const result = vagrantSshSync(command, vvvPath);
