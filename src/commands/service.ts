@@ -4,12 +4,28 @@ import { ensureVvvExists, ensureVvvRunning, cli, exitWithError, verbose, startTi
 import { ensureVagrantInstalled, vagrantSsh, vagrantSshSync } from "../utils/vagrant.js";
 
 // Service name mapping (non-PHP services)
+// Maps user-friendly names to actual service names
 const CORE_SERVICES: Record<string, string> = {
   nginx: "nginx",
   mysql: "mariadb",
   mariadb: "mariadb",
   memcached: "memcached",
+  redis: "redis-server",
+  elasticsearch: "elasticsearch",
+  mailhog: "mailhog",
+  mailpit: "mailpit",
 };
+
+// Services to check in status output (actual service names)
+const STATUS_SERVICES = [
+  "nginx",
+  "mariadb",
+  "memcached",
+  "redis-server",
+  "elasticsearch",
+  "mailhog",
+  "mailpit",
+];
 
 // Base valid services - PHP versions are detected dynamically
 const BASE_VALID_SERVICES = [...Object.keys(CORE_SERVICES), "php"];
@@ -109,19 +125,21 @@ function getServiceName(service: string, vvvPath: string): string {
 
 /**
  * Get status of a single service.
+ * Uses 'service' command instead of systemctl for Docker compatibility.
  */
 function getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
-  const result = vagrantSshSync(`systemctl is-active ${serviceName} 2>/dev/null`, vvvPath);
+  const result = vagrantSshSync(`service ${serviceName} status 2>&1`, vvvPath);
   // Filter out VVV banner lines
   const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;
   const lines = result.stdout.trim().split("\n").filter((line) => {
     return line.trim() !== "" && !boxChars.test(line);
   });
-  // The actual status should be the last non-banner line
-  const status = lines[lines.length - 1]?.trim() || "unknown";
+
+  // Check if any line contains "is running"
+  const isRunning = lines.some((line) => line.includes("is running"));
   return {
-    running: status === "active",
-    status,
+    running: isRunning,
+    status: isRunning ? "active" : "inactive",
   };
 }
 
@@ -140,20 +158,20 @@ function getAllServicesStatus(vvvPath: string): Record<string, { name: string; r
   verbose(`Installed PHP versions: ${phpVersions.join(", ")}`);
 
   // Build list of services to check
-  // Core services
-  const coreServiceList = ["nginx", "mariadb", "memcached"];
   // All installed PHP-FPM versions
   const phpServiceList = phpVersions.map(v => `php${v}-fpm`);
 
-  const allServices = [...coreServiceList, ...phpServiceList];
+  const allServices = [...STATUS_SERVICES, ...phpServiceList];
 
   verbose(`Checking ${allServices.length} services in a single SSH call...`);
   const getElapsed = startTimer();
 
-  // Batch check: run systemctl is-active for all services in one SSH call
+  // Batch check: run service status for all services in one SSH call
+  // Use 'service' instead of 'systemctl' for Docker compatibility
+  // Output format: servicename:active|inactive|notfound
   const command = allServices
-    .map((name) => `echo "${name}:$(systemctl is-active ${name} 2>/dev/null || echo unknown)"`)
-    .join(" && ");
+    .map((name) => `output=$(service ${name} status 2>&1); if echo "$output" | grep -q "is running"; then echo "${name}:active"; elif echo "$output" | grep -q "unrecognized service"; then echo "${name}:notfound"; else echo "${name}:inactive"; fi`)
+    .join("; ");
 
   const result = vagrantSshSync(command, vvvPath);
 
@@ -185,9 +203,14 @@ function getAllServicesStatus(vvvPath: string): Record<string, { name: string; r
     verbose(`SSH command failed: ${result.stderr}`);
   }
 
-  // Build results for core services
-  for (const service of coreServiceList) {
+  // Build results for core services (only show installed ones)
+  for (const service of STATUS_SERVICES) {
     const status = statusMap[service] || "unknown";
+    // Skip services that aren't installed
+    if (status === "notfound" || status === "unknown") {
+      verbose(`Skipping ${service}: not installed`);
+      continue;
+    }
     statuses[service] = {
       name: service,
       running: status === "active",
@@ -238,13 +261,19 @@ const statusCommand = new Command("status")
     const nameWidth = 22;  // Accommodate "php8.2 (default)"
     const serviceWidth = 16;
 
-    console.log(`${"Service".padEnd(nameWidth)}${"Systemd Name".padEnd(serviceWidth)}Status`);
+    console.log(`${"Service".padEnd(nameWidth)}${"Service Name".padEnd(serviceWidth)}Status`);
     console.log("─".repeat(nameWidth + serviceWidth + 12));
+
+    // Map service names to user-friendly display names
+    const displayNames: Record<string, string> = {
+      "redis-server": "redis",
+    };
 
     for (const [service, info] of Object.entries(statuses)) {
       // Show "(default)" indicator for the default PHP version
       const defaultMarker = info.isDefault ? " (default)" : "";
-      const displayName = service + defaultMarker;
+      const friendlyName = displayNames[service] || service;
+      const displayName = friendlyName + defaultMarker;
 
       const statusText = info.running
         ? cli.format.success("running")
@@ -282,7 +311,7 @@ const restartCommand = new Command("restart")
       cli.info(`Restarting ${service} (${serviceName})...`);
     }
 
-    const code = await vagrantSsh(`sudo systemctl restart ${serviceName}`, vvvPath);
+    const code = await vagrantSsh(`sudo service ${serviceName} restart`, vvvPath);
 
     if (options.json) {
       console.log(JSON.stringify({ success: code === 0, service, serviceName, action: "restart" }, null, 2));
@@ -324,7 +353,7 @@ const startCommand = new Command("start")
       cli.info(`Starting ${service} (${serviceName})...`);
     }
 
-    const code = await vagrantSsh(`sudo systemctl start ${serviceName}`, vvvPath);
+    const code = await vagrantSsh(`sudo service ${serviceName} start`, vvvPath);
 
     if (options.json) {
       console.log(JSON.stringify({ success: code === 0, service, serviceName, action: "start" }, null, 2));
@@ -366,7 +395,7 @@ const stopCommand = new Command("stop")
       cli.info(`Stopping ${service} (${serviceName})...`);
     }
 
-    const code = await vagrantSsh(`sudo systemctl stop ${serviceName}`, vvvPath);
+    const code = await vagrantSsh(`sudo service ${serviceName} stop`, vvvPath);
 
     if (options.json) {
       console.log(JSON.stringify({ success: code === 0, service, serviceName, action: "stop" }, null, 2));
