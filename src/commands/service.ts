@@ -126,6 +126,7 @@ function getServiceName(service: string, vvvPath: string): string {
 /**
  * Get status of a single service.
  * Uses 'sudo service' command for proper permissions in Docker containers.
+ * Falls back to pgrep if service script doesn't detect running process.
  */
 function getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
   const result = vagrantSshSync(`sudo service ${serviceName} status 2>&1`, vvvPath);
@@ -136,7 +137,23 @@ function getServiceStatus(serviceName: string, vvvPath: string): { running: bool
   });
 
   // Check if any line contains "is running" or "Uptime" (MariaDB has different output)
-  const isRunning = lines.some((line) => line.includes("is running") || line.includes("Uptime"));
+  let isRunning = lines.some((line) => line.includes("is running") || line.includes("Uptime"));
+
+  // Fallback: check if process is actually running even if service script says no
+  // This handles cases where service was started manually or PID file is missing
+  if (!isRunning) {
+    const processName = serviceName.replace(/\d+\.\d+-/, "-");
+    const pgrepResult = vagrantSshSync(
+      `pgrep -x "${processName}" >/dev/null 2>&1 || pgrep -x "${serviceName}" >/dev/null 2>&1; echo $?`,
+      vvvPath
+    );
+    const exitCode = pgrepResult.stdout.trim().split("\n").pop();
+    if (exitCode === "0") {
+      isRunning = true;
+      verbose(`Service ${serviceName} detected via pgrep fallback`);
+    }
+  }
+
   return {
     running: isRunning,
     status: isRunning ? "active" : "inactive",
@@ -169,10 +186,13 @@ function getAllServicesStatus(vvvPath: string): Record<string, { name: string; r
   // Batch check: run service status for all services in one SSH call
   // Use 'sudo service' for proper permissions in Docker containers
   // Check for "is running" (most services) or "Uptime" (MariaDB has different output)
+  // Fallback to pgrep if service status says not running (handles manual starts, missing PID files)
   // Output format: servicename:active|inactive|notfound
   const command = allServices
     .map((name) => {
-      return `output=$(sudo service ${name} status 2>&1); if echo "$output" | grep -qE "is running|Uptime"; then echo "${name}:active"; elif echo "$output" | grep -q "unrecognized service"; then echo "${name}:notfound"; else echo "${name}:inactive"; fi`;
+      // Get the process name for pgrep (strip version suffixes like php8.2-fpm -> php-fpm)
+      const processName = name.replace(/\d+\.\d+-/, "-");
+      return `output=$(sudo service ${name} status 2>&1); if echo "$output" | grep -qE "is running|Uptime"; then echo "${name}:active"; elif echo "$output" | grep -q "unrecognized service"; then echo "${name}:notfound"; elif pgrep -x "${processName}" >/dev/null 2>&1 || pgrep -x "${name}" >/dev/null 2>&1; then echo "${name}:active"; else echo "${name}:inactive"; fi`;
     })
     .join("; ");
 
