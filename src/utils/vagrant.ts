@@ -6,6 +6,39 @@ import { spawn, spawnSync, type SpawnSyncReturns } from "child_process";
 import { exitWithError, verbose } from "./cli.js";
 
 /**
+ * Escape a string for safe use in a shell single-quoted string.
+ * Replaces ' with '\'' (end quote, escaped quote, start quote).
+ */
+export function escapeShellArg(arg: string): string {
+  return arg.replace(/'/g, "'\\''");
+}
+
+/**
+ * Escape a string for safe use in a MySQL single-quoted string.
+ * Escapes backslashes and single quotes.
+ */
+export function escapeMySqlString(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+/**
+ * Validate that a database name contains only safe characters.
+ * MySQL identifiers can contain alphanumeric, underscore, and dollar sign.
+ * We also allow hyphens as they're common in WordPress database names.
+ */
+export function isValidDatabaseName(name: string): boolean {
+  return /^[a-zA-Z0-9_$-]+$/.test(name) && name.length > 0 && name.length <= 64;
+}
+
+/**
+ * Escape a MySQL identifier (database name, table name, etc.) for use in backticks.
+ * Doubles any backticks in the name.
+ */
+export function escapeMySqlIdentifier(identifier: string): string {
+  return identifier.replace(/`/g, "``");
+}
+
+/**
  * Check if Vagrant is installed and available in PATH.
  */
 export function isVagrantInstalled(): boolean {
@@ -36,6 +69,22 @@ export function vagrantRun(args: string[], vvvPath: string): Promise<number> {
       stdio: "inherit",
     });
 
+    // Track the process for graceful shutdown
+    if (vagrant.pid) {
+      // Dynamic import to avoid circular dependency
+      import("../index.js").then(({ registerChildProcess, unregisterChildProcess }) => {
+        registerChildProcess(vagrant.pid!);
+        vagrant.on("close", () => unregisterChildProcess(vagrant.pid!));
+      }).catch(() => {
+        // Ignore if module not available (e.g., during tests)
+      });
+    }
+
+    vagrant.on("error", (error) => {
+      verbose(`Process error: ${error.message}`);
+      resolve(1);
+    });
+
     vagrant.on("close", (code) => {
       verbose(`Exit code: ${code}`);
       resolve(code ?? 1);
@@ -51,6 +100,21 @@ export function vagrantRunAndExit(args: string[], vvvPath: string): void {
   const vagrant = spawn("vagrant", args, {
     cwd: vvvPath,
     stdio: "inherit",
+  });
+
+  // Track the process for graceful shutdown
+  if (vagrant.pid) {
+    import("../index.js").then(({ registerChildProcess, unregisterChildProcess }) => {
+      registerChildProcess(vagrant.pid!);
+      vagrant.on("close", () => unregisterChildProcess(vagrant.pid!));
+    }).catch(() => {
+      // Ignore if module not available
+    });
+  }
+
+  vagrant.on("error", (error) => {
+    verbose(`Process error: ${error.message}`);
+    process.exit(1);
   });
 
   vagrant.on("close", (code) => {
@@ -116,10 +180,13 @@ export function vagrantSshSync(
 /**
  * Run a MySQL command inside VVV and return the output.
  * Filters out system output and validates results.
+ * Note: query is properly escaped for shell single quotes.
  */
 export function mysqlQuery(query: string, vvvPath: string): string[] {
+  // Escape the query for safe inclusion in a shell single-quoted string
+  const escapedQuery = escapeShellArg(query);
   const result = vagrantSshSync(
-    `mysql --batch --skip-column-names -e '${query}'`,
+    `mysql --batch --skip-column-names -e '${escapedQuery}'`,
     vvvPath
   );
 

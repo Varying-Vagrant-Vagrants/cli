@@ -1,7 +1,82 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand } from "./commands/index.js";
-import { setVerboseMode } from "./utils/cli.js";
+import { setVerboseMode, cli } from "./utils/cli.js";
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (reason, promise) => {
+  cli.error("An unexpected error occurred.");
+  if (reason instanceof Error) {
+    console.error(`Error: ${reason.message}`);
+    if (process.env.DEBUG) {
+      console.error(reason.stack);
+    }
+  } else {
+    console.error(reason);
+  }
+  process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  cli.error("An unexpected error occurred.");
+  console.error(`Error: ${error.message}`);
+  if (process.env.DEBUG) {
+    console.error(error.stack);
+  }
+  process.exit(1);
+});
+
+// Track active child processes for cleanup
+const activeProcesses = new Set<number>();
+
+export function registerChildProcess(pid: number): void {
+  activeProcesses.add(pid);
+}
+
+export function unregisterChildProcess(pid: number): void {
+  activeProcesses.delete(pid);
+}
+
+// Graceful shutdown on SIGINT (Ctrl+C)
+let shuttingDown = false;
+process.on("SIGINT", () => {
+  if (shuttingDown) {
+    // Second SIGINT - force exit
+    process.exit(130);
+  }
+  shuttingDown = true;
+
+  console.log("\n");
+  cli.warning("Shutting down...");
+
+  // Kill any active child processes
+  for (const pid of activeProcesses) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // Process may already be dead
+    }
+  }
+
+  // Give processes time to clean up, then exit
+  setTimeout(() => {
+    process.exit(130);
+  }, 1000);
+});
+
+// Handle SIGTERM for graceful shutdown
+process.on("SIGTERM", () => {
+  cli.warning("Received SIGTERM, shutting down...");
+  for (const pid of activeProcesses) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // Process may already be dead
+    }
+  }
+  process.exit(143);
+});
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {

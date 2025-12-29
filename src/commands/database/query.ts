@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
-import { ensureVvvExists, ensureVvvRunning, cli, exitWithError } from "../../utils/cli.js";
-import { ensureVagrantInstalled, vagrantSshAndExit, vagrantSshSync } from "../../utils/vagrant.js";
+import { ensureVvvExists, ensureVvvRunning, cli } from "../../utils/cli.js";
+import { ensureVagrantInstalled, vagrantSshAndExit, vagrantSshSync, isValidDatabaseName, escapeShellArg } from "../../utils/vagrant.js";
 
 export const queryCommand = new Command("query")
   .alias("mysql")
@@ -21,19 +21,27 @@ export const queryCommand = new Command("query")
     const mysqlArgs = ["mysql", "-u", "root"];
 
     if (database) {
-      mysqlArgs.push(database);
+      // Validate database name if provided
+      if (!isValidDatabaseName(database)) {
+        cli.error(`Invalid database name '${database}'.`);
+        console.log("Database names can only contain letters, numbers, underscores, hyphens, and dollar signs.");
+        process.exit(1);
+      }
+      mysqlArgs.push(`'${escapeShellArg(database)}'`);
     }
 
     // Execute query mode
     if (options.execute) {
       const query = options.execute;
+      // Escape the query for shell single quotes
+      const escapedQuery = escapeShellArg(query);
 
-      // Build the full command
-      const cmd = [...mysqlArgs, "-e", `"${query.replace(/"/g, '\\"')}"`].join(" ");
+      // Build the full command using single quotes for safety
+      const cmd = [...mysqlArgs, "-e", `'${escapedQuery}'`].join(" ");
 
       if (options.json) {
         // Run with --batch for clean output and parse as JSON
-        const batchCmd = [...mysqlArgs, "--batch", "--skip-column-names", "-e", `"${query.replace(/"/g, '\\"')}"`].join(" ");
+        const batchCmd = [...mysqlArgs, "--batch", "--skip-column-names", "-e", `'${escapedQuery}'`].join(" ");
         const result = vagrantSshSync(batchCmd, vvvPath);
 
         if (result.status !== 0) {

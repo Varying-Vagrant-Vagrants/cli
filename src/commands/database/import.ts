@@ -3,7 +3,7 @@ import { existsSync, copyFileSync, unlinkSync } from "fs";
 import { basename, join } from "path";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ensureVvvExists, ensureVvvRunning, cli, exitWithError } from "../../utils/cli.js";
-import { vagrantSsh } from "../../utils/vagrant.js";
+import { vagrantSsh, isValidDatabaseName, escapeMySqlIdentifier, escapeShellArg } from "../../utils/vagrant.js";
 
 function getDecompressCommand(filename: string): string | null {
   if (filename.endsWith(".sql.gz") || filename.endsWith(".gz")) {
@@ -48,6 +48,14 @@ export const importCommand = new Command("import")
 
     ensureVvvExists(vvvPath);
 
+    // Validate database name to prevent injection
+    if (!isValidDatabaseName(database)) {
+      exitWithError(
+        `Invalid database name '${database}'.`,
+        "Database names can only contain letters, numbers, underscores, hyphens, and dollar signs."
+      );
+    }
+
     // Check if file exists
     if (!existsSync(file)) {
       exitWithError(`File not found: ${file}`);
@@ -75,11 +83,16 @@ export const importCommand = new Command("import")
       // Copy file to shared location
       copyFileSync(file, tempPath);
 
+      // Escaped database identifier for SQL
+      const escapedDbIdentifier = escapeMySqlIdentifier(database);
+      // Escaped database name for shell (in case it has special chars after validation)
+      const shellSafeDb = escapeShellArg(database);
+
       // Create database if requested
       if (options.create) {
         console.log(`Creating database '${database}' if it doesn't exist...`);
         const createCode = await vagrantSsh(
-          `mysql -e "CREATE DATABASE IF NOT EXISTS \\\`${database}\\\`"`,
+          `mysql -e "CREATE DATABASE IF NOT EXISTS \\\`${escapedDbIdentifier}\\\`"`,
           vvvPath
         );
         if (createCode !== 0) {
@@ -93,10 +106,10 @@ export const importCommand = new Command("import")
 
       if (decompressCmd) {
         // Decompress and pipe to mysql
-        importCmd = `${decompressCmd} "${vmTempPath}" | mysql "${database}"`;
+        importCmd = `${decompressCmd} "${vmTempPath}" | mysql '${shellSafeDb}'`;
       } else {
         // Direct import
-        importCmd = `mysql "${database}" < "${vmTempPath}"`;
+        importCmd = `mysql '${shellSafeDb}' < "${vmTempPath}"`;
       }
 
       console.log("Importing data...");

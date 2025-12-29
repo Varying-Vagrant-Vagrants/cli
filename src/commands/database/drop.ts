@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ensureVvvExists, ensureVvvRunning, confirm, cli, exitWithError } from "../../utils/cli.js";
-import { vagrantSshSync, SYSTEM_DATABASES } from "../../utils/vagrant.js";
+import { vagrantSshSync, SYSTEM_DATABASES, isValidDatabaseName, escapeMySqlString, escapeMySqlIdentifier } from "../../utils/vagrant.js";
 
 export const dropCommand = new Command("drop")
   .description("Drop (delete) a database")
@@ -13,6 +13,14 @@ export const dropCommand = new Command("drop")
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
+
+    // Validate database name to prevent injection
+    if (!isValidDatabaseName(name)) {
+      exitWithError(
+        `Invalid database name '${name}'.`,
+        "Database names can only contain letters, numbers, underscores, hyphens, and dollar signs."
+      );
+    }
 
     // Prevent dropping system databases
     if (SYSTEM_DATABASES.includes(name)) {
@@ -30,9 +38,10 @@ export const dropCommand = new Command("drop")
 
     ensureVvvRunning(vvvPath);
 
-    // Check if database exists
+    // Check if database exists (use escaped name in query)
+    const escapedName = escapeMySqlString(name);
     const checkResult = vagrantSshSync(
-      `mysql --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '${name}'"`,
+      `mysql --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '${escapedName}'"`,
       vvvPath
     );
 
@@ -58,9 +67,10 @@ export const dropCommand = new Command("drop")
 
     console.log(`\nDropping database '${name}'...`);
 
-    // Drop the database
+    // Drop the database (use escaped identifier)
+    const escapedIdentifier = escapeMySqlIdentifier(name);
     const dropResult = vagrantSshSync(
-      `mysql -e "DROP DATABASE \\\`${name}\\\`"`,
+      `mysql -e "DROP DATABASE \\\`${escapedIdentifier}\\\`"`,
       vvvPath
     );
 
