@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
-import { ensureVvvExists, ensureVvvRunning, cli } from "../../utils/cli.js";
+import { ensureVvvExists, ensureVvvRunning, cli, startTimer } from "../../utils/cli.js";
 import { vagrantSsh } from "../../utils/vagrant.js";
 
 export const backupCommand = new Command("backup")
@@ -12,13 +12,16 @@ export const backupCommand = new Command("backup")
     ensureVvvExists(vvvPath);
     ensureVvvRunning(vvvPath);
 
-    console.log("Backing up databases...");
+    cli.info("Backing up databases...");
 
+    const getElapsed = startTimer();
     const code = await vagrantSsh("db_backup", vvvPath);
+    const elapsed = getElapsed();
+
     if (code === 0) {
-      cli.success("\nBackups saved to: database/sql/backups/");
+      cli.success(`\nBackups saved to: database/sql/backups/ (${elapsed})`);
     } else {
-      cli.error("\nBackup failed.");
+      cli.error(`\nBackup failed (${elapsed})`);
       process.exit(code);
     }
   });

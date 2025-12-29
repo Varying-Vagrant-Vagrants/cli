@@ -9,6 +9,32 @@ import React from "react";
 import { render, Text, Box } from "ink";
 import Spinner from "ink-spinner";
 
+// Global verbose mode state
+let verboseMode = false;
+
+/**
+ * Enable or disable verbose mode globally.
+ */
+export function setVerboseMode(enabled: boolean): void {
+  verboseMode = enabled;
+}
+
+/**
+ * Check if verbose mode is enabled.
+ */
+export function isVerbose(): boolean {
+  return verboseMode;
+}
+
+/**
+ * Log a message only if verbose mode is enabled.
+ */
+export function verbose(message: string): void {
+  if (verboseMode) {
+    console.log(`\x1b[2m[verbose] ${message}\x1b[0m`);
+  }
+}
+
 // ANSI color codes
 const colors = {
   red: "\x1b[31m",
@@ -44,10 +70,20 @@ export const cli = {
 };
 
 /**
- * Exit with an error message.
+ * Exit with an error message and optional suggestion.
  */
-export function exitWithError(message: string, code: number = 1): never {
+export function exitWithError(message: string, suggestion?: string | number, code: number = 1): never {
+  // Handle backwards compatibility: if suggestion is a number, it's the exit code
+  if (typeof suggestion === "number") {
+    cli.error(message);
+    process.exit(suggestion);
+  }
+
   cli.error(message);
+  if (suggestion) {
+    console.log("");
+    console.log(`${colors.dim}Suggestion:${colors.reset} ${suggestion}`);
+  }
   process.exit(code);
 }
 
@@ -84,7 +120,10 @@ export async function confirm(question: string): Promise<boolean> {
  */
 export function ensureVvvExists(vvvPath: string): void {
   if (!vvvExists(vvvPath)) {
-    exitWithError(`VVV not found at ${vvvPath}`);
+    exitWithError(
+      `VVV not found at ${vvvPath}`,
+      `Run 'vvvlocal install' to set up VVV, or use --path to specify the location.`
+    );
   }
 }
 
@@ -126,7 +165,10 @@ export function siteExists(vvvPath: string, siteName: string): boolean {
  */
 export function ensureSiteExists(vvvPath: string, siteName: string): void {
   if (!siteExists(vvvPath, siteName)) {
-    exitWithError(`Site '${siteName}' does not exist.`);
+    exitWithError(
+      `Site '${siteName}' does not exist.`,
+      `Run 'vvvlocal site list' to see available sites.`
+    );
   }
 }
 
@@ -135,7 +177,10 @@ export function ensureSiteExists(vvvPath: string, siteName: string): void {
  */
 export function ensureSiteNotExists(vvvPath: string, siteName: string): void {
   if (siteExists(vvvPath, siteName)) {
-    exitWithError(`Site '${siteName}' already exists.`);
+    exitWithError(
+      `Site '${siteName}' already exists.`,
+      `Use 'vvvlocal site update ${siteName}' to modify it, or choose a different name.`
+    );
   }
 }
 

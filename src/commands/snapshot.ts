@@ -110,12 +110,22 @@ const restoreCommand = new Command("restore")
   .argument("<name>", "Name of the snapshot to restore")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("-y, --yes", "Skip confirmation prompt")
+  .option("--dry-run", "Show what would be done without making changes")
   .option("--json", "Output as JSON")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
     ensureVagrantInstalled();
+
+    // Dry-run mode
+    if (options.dryRun) {
+      cli.info("Dry run - no changes will be made:");
+      console.log("");
+      console.log(`  Would restore VM to snapshot '${name}'`);
+      console.log("  Any unsaved changes would be lost");
+      return;
+    }
 
     // Confirm unless --yes flag
     if (!options.yes && !options.json) {
@@ -158,12 +168,22 @@ const deleteCommand = new Command("delete")
   .argument("<name>", "Name of the snapshot to delete")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("-y, --yes", "Skip confirmation prompt")
+  .option("--dry-run", "Show what would be done without making changes")
   .option("--json", "Output as JSON")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
     ensureVagrantInstalled();
+
+    // Dry-run mode
+    if (options.dryRun) {
+      cli.info("Dry run - no changes will be made:");
+      console.log("");
+      console.log(`  Would delete snapshot '${name}'`);
+      console.log("  This action would be permanent");
+      return;
+    }
 
     // Confirm unless --yes flag
     if (!options.yes && !options.json) {

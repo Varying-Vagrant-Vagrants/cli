@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand } from "./commands/index.js";
+import { setVerboseMode } from "./utils/cli.js";
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {
@@ -66,6 +67,7 @@ function formatGroupedHelp(program: Command): string {
   lines.push(`${bold}Options:${reset}`);
   const optionWidth = 30;
   lines.push(`  ${cyan}${"-V, --version".padEnd(optionWidth)}${reset}output the version number`);
+  lines.push(`  ${cyan}${"--verbose".padEnd(optionWidth)}${reset}show detailed output`);
   lines.push(`  ${cyan}${"-h, --help".padEnd(optionWidth)}${reset}display help for command`);
   lines.push("");
 
@@ -133,8 +135,15 @@ program
   .name("vvvlocal")
   .description("CLI tool for VVV (Varying Vagrant Vagrants)")
   .version("0.1.0")
+  .option("--verbose", "Show detailed output")
   .addHelpText("beforeAll", logo)
   .addHelpCommand(false) // Disable help subcommand
+  .hook("preAction", (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.verbose) {
+      setVerboseMode(true);
+    }
+  })
   .action(() => {
     // When run without arguments, show custom help
     console.log(logo);

@@ -1,12 +1,12 @@
 import { Command } from "commander";
-import { spawnSync } from "child_process";
+import { spawnSync, spawn } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { arch, platform, release } from "os";
 import React from "react";
 import { render } from "ink";
 import { loadConfig, DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists } from "../utils/cli.js";
+import { ensureVvvExists, verbose } from "../utils/cli.js";
 import { SystemInfo } from "../components/SystemInfo.js";
 
 function getVVVVersion(vvvPath: string): string {
@@ -28,11 +28,47 @@ function getGitBranch(vvvPath: string): string | null {
   const result = spawnSync("git", ["branch", "--show-current"], {
     cwd: vvvPath,
     encoding: "utf-8",
+    timeout: 5000,
   });
   if (result.status === 0) {
     return result.stdout.trim();
   }
   return null;
+}
+
+/**
+ * Async version of getGitBranch for parallel execution
+ */
+async function getGitBranchAsync(vvvPath: string): Promise<string | null> {
+  if (!isGitInstall(vvvPath)) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn("git", ["branch", "--show-current"], {
+      cwd: vvvPath,
+    });
+
+    let stdout = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve(null);
+    }, 5000);
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve(code === 0 ? stdout.trim() : null);
+    });
+
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+  });
 }
 
 async function getLatestVVVVersion(): Promise<string | null> {
@@ -51,12 +87,45 @@ async function getLatestVVVVersion(): Promise<string | null> {
 }
 
 function getVagrantVersion(): string {
-  const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8" });
+  const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8", timeout: 5000 });
   if (result.status === 0) {
     // Output is like "Vagrant 2.4.1"
     return result.stdout.trim().replace("Vagrant ", "");
   }
   return "not installed";
+}
+
+/**
+ * Async version of getVagrantVersion for parallel execution
+ */
+async function getVagrantVersionAsync(): Promise<string> {
+  return new Promise((resolve) => {
+    const child = spawn("vagrant", ["--version"]);
+
+    let stdout = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve("not installed");
+    }, 5000);
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(stdout.trim().replace("Vagrant ", ""));
+      } else {
+        resolve("not installed");
+      }
+    });
+
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve("not installed");
+    });
+  });
 }
 
 function getProvider(vvvPath: string): string {
@@ -121,18 +190,32 @@ export const infoCommand = new Command("info")
 
     ensureVvvExists(vvvPath);
 
+    const startTime = Date.now();
+    verbose("Gathering system information in parallel...");
+
+    // Quick synchronous checks
     const gitInstall = isGitInstall(vvvPath);
-    const gitBranch = getGitBranch(vvvPath);
     const vvvVersion = getVVVVersion(vvvPath);
-    const latestVersion = await getLatestVVVVersion();
+    const provider = getProvider(vvvPath);
+    const architecture = getArchitecture();
+    const osName = getOSName();
+
+    // Run slow async operations in parallel
+    const [gitBranch, latestVersion, vagrantVersion] = await Promise.all([
+      getGitBranchAsync(vvvPath),
+      getLatestVVVVersion(),
+      getVagrantVersionAsync(),
+    ]);
+
+    verbose(`System info gathered in ${Date.now() - startTime}ms`);
 
     const info = {
       vvvVersion,
       latestVersion,
-      vagrantVersion: getVagrantVersion(),
-      provider: getProvider(vvvPath),
-      arch: getArchitecture(),
-      os: getOSName(),
+      vagrantVersion,
+      provider,
+      arch: architecture,
+      os: osName,
       vvvPath,
       gitInstall,
       gitBranch,

@@ -29,6 +29,7 @@ export const removeCommand = new Command("remove")
   .argument("<name>", "Name of the site to remove")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("-f, --force", "Skip confirmation prompt")
+  .option("--dry-run", "Show what would be done without making changes")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
@@ -44,6 +45,16 @@ export const removeCommand = new Command("remove")
     }
 
     const sitePath = getSiteLocalPath(vvvPath, name, siteConfig);
+
+    // Dry-run mode
+    if (options.dryRun) {
+      cli.info("Dry run - no changes will be made:");
+      console.log("");
+      console.log(`  Would remove site '${name}' from config.yml`);
+      console.log(`  Site files would remain at: ${sitePath}`);
+      console.log(`  You would need to run 'vvvlocal reprovision' to update the VM`);
+      return;
+    }
 
     // Confirm removal unless --force is used
     if (!options.force) {

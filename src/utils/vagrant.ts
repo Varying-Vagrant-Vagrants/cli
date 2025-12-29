@@ -3,7 +3,7 @@
  */
 
 import { spawn, spawnSync, type SpawnSyncReturns } from "child_process";
-import { exitWithError } from "./cli.js";
+import { exitWithError, verbose } from "./cli.js";
 
 /**
  * Check if Vagrant is installed and available in PATH.
@@ -27,6 +27,9 @@ export function ensureVagrantInstalled(): void {
  * Returns a promise that resolves with the exit code.
  */
 export function vagrantRun(args: string[], vvvPath: string): Promise<number> {
+  verbose(`Running: vagrant ${args.join(" ")}`);
+  verbose(`Working directory: ${vvvPath}`);
+
   return new Promise((resolve) => {
     const vagrant = spawn("vagrant", args, {
       cwd: vvvPath,
@@ -34,6 +37,7 @@ export function vagrantRun(args: string[], vvvPath: string): Promise<number> {
     });
 
     vagrant.on("close", (code) => {
+      verbose(`Exit code: ${code}`);
       resolve(code ?? 1);
     });
   });
@@ -55,15 +59,19 @@ export function vagrantRunAndExit(args: string[], vvvPath: string): void {
 }
 
 /**
- * Run a vagrant command synchronously.
+ * Run a vagrant command synchronously with timeout.
  */
 export function vagrantRunSync(
   args: string[],
-  vvvPath: string
+  vvvPath: string,
+  timeout: number = 30000
 ): SpawnSyncReturns<string> {
+  verbose(`Running sync: vagrant ${args.join(" ")}`);
+
   return spawnSync("vagrant", args, {
     cwd: vvvPath,
     encoding: "utf-8",
+    timeout,
   });
 }
 
@@ -88,13 +96,21 @@ export function vagrantSshAndExit(command: string, vvvPath: string): void {
  */
 export function vagrantSshSync(
   command: string,
-  vvvPath: string
+  vvvPath: string,
+  timeout: number = 30000
 ): SpawnSyncReturns<string> {
-  return spawnSync("vagrant", ["ssh", "-c", command, "--", "-T"], {
+  verbose(`SSH command: ${command}`);
+  verbose(`Working directory: ${vvvPath}`);
+
+  const result = spawnSync("vagrant", ["ssh", "-c", command, "--", "-T"], {
     cwd: vvvPath,
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
+    timeout,
   });
+
+  verbose(`Exit code: ${result.status}`);
+  return result;
 }
 
 /**

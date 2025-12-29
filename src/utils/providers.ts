@@ -1,6 +1,7 @@
-import { spawnSync } from "child_process";
+import { spawnSync, spawn } from "child_process";
 import { platform } from "os";
 import { loadConfig } from "./config.js";
+import { verbose } from "./cli.js";
 
 export interface Provider {
   name: string;
@@ -62,7 +63,87 @@ export function getProvidersForPlatform(): Provider[] {
 }
 
 /**
- * Detect which providers are available/installed on the current system
+ * Check if a single provider is available (async with timeout)
+ */
+async function checkProviderAsync(provider: Provider, timeout: number = 5000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(provider.command, provider.args, {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let resolved = false;
+
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        child.kill();
+        verbose(`Provider check timed out: ${provider.name}`);
+        resolve(false);
+      }
+    }, timeout);
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.on("close", (code) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+
+      // Special handling for Hyper-V check
+      if (provider.name === "hyperv") {
+        resolve(code === 0 && stdout.includes("Enabled"));
+      } else {
+        resolve(code === 0);
+      }
+    });
+
+    child.on("error", () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * Detect which providers are available/installed on the current system (async, parallel)
+ */
+export async function detectAvailableProvidersAsync(): Promise<Provider[]> {
+  const currentPlatform = platform();
+  const startTime = Date.now();
+
+  // Filter providers for current platform
+  const providersToCheck = PROVIDERS.filter(
+    (p) => !p.platformOnly || p.platformOnly === currentPlatform
+  );
+
+  verbose(`Checking ${providersToCheck.length} providers in parallel...`);
+
+  // Check all providers in parallel
+  const results = await Promise.all(
+    providersToCheck.map(async (provider) => {
+      const available = await checkProviderAsync(provider);
+      verbose(`Provider ${provider.name}: ${available ? "available" : "not found"}`);
+      return { provider, available };
+    })
+  );
+
+  const available = results
+    .filter((r) => r.available)
+    .map((r) => r.provider);
+
+  verbose(`Provider detection completed in ${Date.now() - startTime}ms`);
+
+  return available;
+}
+
+/**
+ * Detect which providers are available/installed on the current system (sync, sequential)
+ * @deprecated Use detectAvailableProvidersAsync for better performance
  */
 export function detectAvailableProviders(): Provider[] {
   const available: Provider[] = [];
@@ -77,6 +158,7 @@ export function detectAvailableProviders(): Provider[] {
     const result = spawnSync(provider.command, provider.args, {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      timeout: 5000, // Add timeout
     });
 
     // Special handling for Hyper-V check

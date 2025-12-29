@@ -6,7 +6,7 @@ import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { cli } from "../utils/cli.js";
 import {
   PROVIDERS,
-  detectAvailableProviders,
+  detectAvailableProvidersAsync,
   getCurrentProvider,
 } from "../utils/providers.js";
 
@@ -14,12 +14,12 @@ export const providersCommand = new Command("providers")
   .description("List available virtualization providers")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
-  .action((options) => {
+  .action(async (options) => {
     const vvvPath = options.path;
     const currentPlatform = platform();
 
-    // Detect available providers
-    const availableProviders = detectAvailableProviders();
+    // Detect available providers (parallel detection for faster startup)
+    const availableProviders = await detectAvailableProvidersAsync();
     const availableNames = new Set(availableProviders.map((p) => p.name));
 
     // Check if VVV exists to determine current provider

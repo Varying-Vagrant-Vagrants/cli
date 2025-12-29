@@ -1,18 +1,30 @@
 import { Command } from "commander";
 import { rmSync } from "fs";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, confirm, cli } from "../utils/cli.js";
+import { ensureVvvExists, confirm, cli, startTimer } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 
 export const destroyCommand = new Command("destroy")
   .description("Destroy the VVV virtual machine and optionally remove files")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("-f, --force", "Skip confirmation prompts")
+  .option("--dry-run", "Show what would be done without making changes")
   .action(async (options) => {
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
     ensureVagrantInstalled();
+
+    // Dry-run mode
+    if (options.dryRun) {
+      cli.info("Dry run - no changes will be made:");
+      console.log("");
+      console.log(`  Would destroy VM at: ${vvvPath}`);
+      console.log("  Would run: vagrant destroy --force");
+      console.log("");
+      console.log("  After VM destruction, you would be asked to remove files.");
+      return;
+    }
 
     if (!options.force) {
       cli.error("Warning: This will destroy the VVV virtual machine.");
@@ -27,16 +39,21 @@ export const destroyCommand = new Command("destroy")
       }
     }
 
-    console.log("\nDestroying VVV virtual machine...");
+    cli.info("Destroying VVV virtual machine...");
+    console.log("");
 
+    const getElapsed = startTimer();
     const code = await vagrantRun(["destroy", "--force"], vvvPath);
+    const elapsed = getElapsed();
 
     if (code !== 0) {
-      cli.error("Failed to destroy VM.");
+      console.log("");
+      cli.error(`Failed to destroy VM (${elapsed})`);
       process.exit(code);
     }
 
-    cli.success("VM destroyed successfully.");
+    console.log("");
+    cli.success(`VM destroyed successfully (${elapsed})`);
     console.log("");
 
     // Ask about removing files

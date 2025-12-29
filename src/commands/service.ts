@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, ensureVvvRunning, cli, exitWithError } from "../utils/cli.js";
+import { ensureVvvExists, ensureVvvRunning, cli, exitWithError, verbose, startTimer } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantSsh, vagrantSshSync } from "../utils/vagrant.js";
 
 // Service name mapping
@@ -50,15 +50,56 @@ function getServiceStatus(serviceName: string, vvvPath: string): { running: bool
 }
 
 /**
- * Get status of all services.
+ * Get status of all services using a single batched SSH call.
+ * Much faster than calling getServiceStatus for each service individually.
  */
 function getAllServicesStatus(vvvPath: string): Record<string, { name: string; running: boolean; status: string }> {
   const statuses: Record<string, { name: string; running: boolean; status: string }> = {};
 
+  // First, get PHP service name (requires one SSH call)
+  const phpServiceName = getPhpServiceName(vvvPath);
+
+  // Build a map of service names
+  const serviceNames: Record<string, string> = {};
   for (const service of VALID_SERVICES) {
-    const serviceName = getServiceName(service, vvvPath);
-    const { running, status } = getServiceStatus(serviceName, vvvPath);
-    statuses[service] = { name: serviceName, running, status };
+    serviceNames[service] = service === "php" ? phpServiceName : (SERVICES[service] || service);
+  }
+
+  // Get all unique systemd service names
+  const uniqueNames = [...new Set(Object.values(serviceNames))];
+
+  verbose(`Checking ${uniqueNames.length} services in a single SSH call...`);
+  const getElapsed = startTimer();
+
+  // Batch check: run systemctl is-active for all services in one SSH call
+  const command = uniqueNames
+    .map((name) => `echo "${name}:$(systemctl is-active ${name} 2>/dev/null || echo unknown)"`)
+    .join(" && ");
+
+  const result = vagrantSshSync(command, vvvPath);
+
+  verbose(`Service status check completed (${getElapsed()})`);
+
+  // Parse results
+  const statusMap: Record<string, string> = {};
+  if (result.status === 0) {
+    for (const line of result.stdout.trim().split("\n")) {
+      const [name, status] = line.split(":");
+      if (name && status) {
+        statusMap[name.trim()] = status.trim();
+      }
+    }
+  }
+
+  // Map back to our service structure
+  for (const service of VALID_SERVICES) {
+    const serviceName = serviceNames[service] || service;
+    const status = statusMap[serviceName] || "unknown";
+    statuses[service] = {
+      name: serviceName,
+      running: status === "active",
+      status,
+    };
   }
 
   return statuses;

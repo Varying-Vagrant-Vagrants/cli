@@ -3,9 +3,9 @@ import { spawnSync, spawn } from "child_process";
 import { existsSync } from "fs";
 import { platform } from "os";
 import { join } from "path";
-import { cli, askQuestion, confirm, exitWithError } from "../utils/cli.js";
+import { cli, askQuestion, confirm, exitWithError, startTimer } from "../utils/cli.js";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { type Provider, detectAvailableProviders } from "../utils/providers.js";
+import { type Provider, detectAvailableProvidersAsync } from "../utils/providers.js";
 
 function isVagrantInstalled(): boolean {
   const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8" });
@@ -99,8 +99,8 @@ export const installCommand = new Command("install")
     const vagrantVersion = getVagrantVersion();
     cli.success(`Vagrant ${vagrantVersion} found`);
 
-    // Step 3: Check for providers
-    const availableProviders = detectAvailableProviders();
+    // Step 3: Check for providers (parallel detection)
+    const availableProviders = await detectAvailableProvidersAsync();
 
     if (availableProviders.length === 0) {
       cli.error("No supported virtualization provider found.");
@@ -178,6 +178,7 @@ export const installCommand = new Command("install")
     console.log("");
     cli.info(`Installing VVV (${options.branch} branch)...`);
 
+    const getElapsed = startTimer();
     const cloneResult = await cloneVVV(targetPath, options.branch);
     if (cloneResult !== 0) {
       exitWithError("Failed to clone VVV repository.");
@@ -190,9 +191,11 @@ export const installCommand = new Command("install")
       cli.success("Default configuration created");
     }
 
+    const elapsed = getElapsed();
+
     // Step 8: Show next steps
     console.log("");
-    cli.success("VVV installation complete!");
+    cli.success(`VVV installation complete! (${elapsed})`);
     console.log("");
     console.log("Next steps:");
     console.log(`  1. cd ${targetPath}`);

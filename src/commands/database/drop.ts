@@ -8,6 +8,7 @@ export const dropCommand = new Command("drop")
   .argument("<name>", "Name of the database to drop")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("-y, --yes", "Skip confirmation prompt")
+  .option("--dry-run", "Show what would be done without making changes")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
@@ -16,6 +17,15 @@ export const dropCommand = new Command("drop")
     // Prevent dropping system databases
     if (SYSTEM_DATABASES.includes(name)) {
       exitWithError(`Cannot drop system database '${name}'.`);
+    }
+
+    // Dry-run mode
+    if (options.dryRun) {
+      cli.info("Dry run - no changes will be made:");
+      console.log("");
+      console.log(`  Would drop database '${name}'`);
+      console.log("  This action would be permanent and cannot be undone");
+      return;
     }
 
     ensureVvvRunning(vvvPath);
