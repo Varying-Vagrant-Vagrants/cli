@@ -1,0 +1,64 @@
+name: Integration Tests
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+
+  # Weekly schedule - Sunday at 00:00 UTC
+  schedule:
+    - cron: "0 0 * * 0"
+
+  # PR trigger when labeled
+  pull_request:
+    types: [labeled]
+
+jobs:
+  integration-test:
+    name: Integration Tests (Docker)
+    runs-on: ubuntu-latest
+
+    # Only run if manually triggered, scheduled, or PR has the label
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      contains(github.event.pull_request.labels.*.name, 'run-integration-tests')
+
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Vagrant
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update && sudo apt-get install vagrant -y
+          vagrant --version
+
+      - name: Verify Docker
+        run: |
+          docker info
+          docker --version
+
+      - name: Run integration tests
+        env:
+          VVV_INTEGRATION_TEST: "1"
+        run: bun test tests/integration/integration.test.ts --timeout 900000
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: /tmp/vvv-test-*/
+          retention-days: 3
+          if-no-files-found: ignore
