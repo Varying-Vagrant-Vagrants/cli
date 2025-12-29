@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
 import { setVerboseMode, cli } from "./utils/cli.js";
 
 // Handle unhandled promise rejections
@@ -126,7 +126,7 @@ const commandGroups = [
   },
   {
     name: "System",
-    commands: ["completion", "config", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
+    commands: ["completion", "config", "doctor", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
   },
 ];
 
@@ -235,6 +235,7 @@ program.addCommand(completionCommand);
 program.addCommand(configCommand);
 program.addCommand(databaseCommand);
 program.addCommand(destroyCommand);
+program.addCommand(doctorCommand);
 program.addCommand(execCommand);
 program.addCommand(extensionCommand);
 program.addCommand(infoCommand);
