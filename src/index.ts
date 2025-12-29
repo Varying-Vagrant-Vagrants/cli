@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand } from "./commands/index.js";
 
 // Prevent running as root
 if (process.getuid && process.getuid() === 0) {
@@ -50,7 +50,7 @@ const commandGroups = [
   },
   {
     name: "System",
-    commands: ["config", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
+    commands: ["completion", "config", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
   },
 ];
 
@@ -147,6 +147,7 @@ program.helpInformation = function() {
   return formatGroupedHelp(program);
 };
 
+program.addCommand(completionCommand);
 program.addCommand(configCommand);
 program.addCommand(databaseCommand);
 program.addCommand(destroyCommand);

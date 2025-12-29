@@ -22,3 +22,4 @@ export { xdebugCommand } from "./xdebug.js";
 export { installCommand } from "./install.js";
 export { providersCommand } from "./providers.js";
 export { upgradeCommand } from "./upgrade.js";
+export { completionCommand } from "./completion.js";

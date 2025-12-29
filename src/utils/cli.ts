@@ -5,6 +5,9 @@
 import { createInterface } from "readline";
 import { spawnSync } from "child_process";
 import { vvvExists, loadConfig } from "./config.js";
+import React from "react";
+import { render, Text, Box } from "ink";
+import Spinner from "ink-spinner";
 
 // ANSI color codes
 const colors = {
@@ -134,4 +137,146 @@ export function ensureSiteNotExists(vvvPath: string, siteName: string): void {
   if (siteExists(vvvPath, siteName)) {
     exitWithError(`Site '${siteName}' already exists.`);
   }
+}
+
+/**
+ * Format elapsed time in a human-readable format.
+ */
+export function formatElapsedTime(startTime: number): string {
+  const elapsed = Date.now() - startTime;
+  const seconds = Math.floor(elapsed / 1000);
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes > 0) {
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+/**
+ * Spinner component for displaying loading state.
+ */
+interface SpinnerProps {
+  message: string;
+}
+
+function SpinnerComponent({ message }: SpinnerProps): React.ReactElement {
+  return React.createElement(Box, null,
+    React.createElement(Text, { color: "cyan" },
+      React.createElement(Spinner, { type: "dots" })
+    ),
+    React.createElement(Text, null, ` ${message}`)
+  );
+}
+
+/**
+ * Success component for displaying completion state.
+ */
+interface SuccessProps {
+  message: string;
+  elapsed: string;
+}
+
+function SuccessComponent({ message, elapsed }: SuccessProps): React.ReactElement {
+  return React.createElement(Box, null,
+    React.createElement(Text, { color: "green" }, "✓"),
+    React.createElement(Text, null, ` ${message} `),
+    React.createElement(Text, { color: "dim" }, `(${elapsed})`)
+  );
+}
+
+/**
+ * Error component for displaying failure state.
+ */
+interface ErrorProps {
+  message: string;
+  elapsed: string;
+}
+
+function ErrorComponent({ message, elapsed }: ErrorProps): React.ReactElement {
+  return React.createElement(Box, null,
+    React.createElement(Text, { color: "red" }, "✗"),
+    React.createElement(Text, null, ` ${message} `),
+    React.createElement(Text, { color: "dim" }, `(${elapsed})`)
+  );
+}
+
+/**
+ * Run an async task with a spinner indicator.
+ * Shows a spinner while the task runs, then shows success/error with elapsed time.
+ * Best for tasks that don't produce their own output.
+ *
+ * @param message - The message to display while the task is running
+ * @param task - The async task to run
+ * @returns The result of the task
+ */
+export async function withSpinner<T>(
+  message: string,
+  task: () => Promise<T>
+): Promise<T> {
+  const startTime = Date.now();
+
+  // Render the spinner
+  const { rerender, unmount } = render(
+    React.createElement(SpinnerComponent, { message })
+  );
+
+  try {
+    const result = await task();
+    const elapsed = formatElapsedTime(startTime);
+
+    // Show success
+    rerender(React.createElement(SuccessComponent, { message, elapsed }));
+    unmount();
+
+    return result;
+  } catch (error) {
+    const elapsed = formatElapsedTime(startTime);
+
+    // Show error
+    rerender(React.createElement(ErrorComponent, { message: `${message} - failed`, elapsed }));
+    unmount();
+
+    throw error;
+  }
+}
+
+/**
+ * Simple elapsed time tracker for manual timing.
+ * Returns a function that, when called, returns the formatted elapsed time.
+ */
+export function startTimer(): () => string {
+  const startTime = Date.now();
+  return () => formatElapsedTime(startTime);
+}
+
+/**
+ * Run a command with timing, showing elapsed time on completion.
+ * Best for commands that produce their own output (like vagrant).
+ *
+ * @param startMessage - Message to show before command runs
+ * @param task - The async task to run (should return exit code)
+ * @param successMessage - Message to show on success (optional)
+ */
+export async function withTiming(
+  startMessage: string,
+  task: () => Promise<number>,
+  successMessage?: string
+): Promise<number> {
+  cli.info(startMessage);
+  console.log("");
+
+  const getElapsed = startTimer();
+  const code = await task();
+  const elapsed = getElapsed();
+
+  console.log("");
+  if (code === 0) {
+    cli.success(`${successMessage || "Done"} (${elapsed})`);
+  } else {
+    cli.error(`Failed (${elapsed})`);
+  }
+
+  return code;
 }
