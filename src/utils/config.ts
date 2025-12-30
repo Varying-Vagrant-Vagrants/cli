@@ -15,6 +15,7 @@ export interface VVVConfig {
 
 export interface CliConfig {
   tips?: boolean;
+  splash?: boolean;
 }
 
 export interface SiteConfig {
