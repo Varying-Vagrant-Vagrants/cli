@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { existsSync, readdirSync, unlinkSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { platform, arch } from "os";
 import { spawnSync } from "child_process";
@@ -29,7 +29,8 @@ export function findGoodhostsBinary(vvvPath: string): string | null {
   }
 
   // Determine expected binary name based on OS and architecture
-  const os = platform() === "darwin" ? "darwin" : "linux";
+  // Note: goodhosts uses "osx" not "darwin" for macOS
+  const os = platform() === "darwin" ? "osx" : "linux";
   const cpuArch = arch() === "arm64" ? "arm64" : "amd64";
   const binaryName = `cli_${cpuArch}_${os}`;
 
