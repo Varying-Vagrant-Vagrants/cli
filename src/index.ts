@@ -3,6 +3,10 @@ import { Command } from "commander";
 import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
 import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
 import { setTipsEnabledFromCli } from "./utils/tips.js";
+import { getCliVersion, getBuildDate, formatBuildDate, isCompiledBinary } from "./utils/version.js";
+import { VERSION } from "./version.js";
+import { getVVVVersion } from "./commands/info.js";
+import { DEFAULT_VVV_PATH, vvvExists, loadConfig } from "./utils/config.js";
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, _promise) => {
@@ -104,12 +108,45 @@ function getCliColors() {
   };
 }
 
+function shouldShowSplash(): boolean {
+  // Check if splash is disabled in config
+  try {
+    if (vvvExists(DEFAULT_VVV_PATH)) {
+      const config = loadConfig(DEFAULT_VVV_PATH);
+      if (config.cli?.splash === false) {
+        return false;
+      }
+    }
+  } catch {
+    // If config can't be loaded, show splash
+  }
+  return true;
+}
+
 function getLogo() {
-  const { red, green, blue, reset } = getCliColors();
+  // Check if splash is disabled
+  if (!shouldShowSplash()) {
+    return "";
+  }
+
+  const { red, green, blue, reset, dim } = getCliColors();
+
+  // Get CLI version info
+  const cliVersion = isCompiledBinary()
+    ? `v${VERSION} (${formatBuildDate(getBuildDate())})`
+    : `v${VERSION}-dev`;
+
+  // Always try to get VVV version from default path
+  let vvvVersion = "";
+  if (vvvExists(DEFAULT_VVV_PATH)) {
+    const vvvVer = getVVVVersion(DEFAULT_VVV_PATH);
+    vvvVersion = vvvVer !== "unknown" ? vvvVer : "";
+  }
+
   return `
 ${red}__ ${green}__ ${blue}__ __
-${red}\\ V${green}\\ V${blue}\\ V /${reset}  vvvlocal
-${red} \\_/${green}\\_/${blue}\\_/${reset}   CLI for VVV
+${red}\\ V${green}\\ V${blue}\\ V /${reset}  cli: ${dim}${cliVersion}${reset}
+${red} \\_/${green}\\_/${blue}\\_/${reset}   ${vvvVersion ? `VVV: ${dim}v${vvvVersion}${reset}` : "CLI for VVV"}
 `;
 }
 
@@ -221,7 +258,7 @@ const program = new Command();
 program
   .name("vvvlocal")
   .description("CLI tool for VVV (Varying Vagrant Vagrants)")
-  .version("0.1.0")
+  .version(VERSION)
   .option("--verbose", "Show detailed output")
   .option("--no-tips", "Disable helpful tips")
   .addHelpText("beforeAll", () => getLogo())
