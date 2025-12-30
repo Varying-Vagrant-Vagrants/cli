@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, cli, startTimer } from "../utils/cli.js";
+import { ensureVvvExists, cli, startTimer, isVvvRunning } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 import { getCurrentProvider } from "../utils/providers.js";
 import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
@@ -17,8 +17,10 @@ export const upCommand = new Command("up")
     ensureVagrantInstalled();
 
     // Check for port conflicts when using Docker provider
+    // Skip check if VVV is already running (it's using those ports)
     const provider = getCurrentProvider(vvvPath);
-    if (provider === "docker") {
+    const alreadyRunning = isVvvRunning(vvvPath);
+    if (provider === "docker" && !alreadyRunning) {
       const conflicts = checkPortConflicts(VVV_PORTS);
       if (conflicts.length > 0) {
         cli.error("Port conflicts detected - VVV cannot start");
