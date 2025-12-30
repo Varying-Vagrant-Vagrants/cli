@@ -153,21 +153,44 @@ function getOSName(): string {
   const rel = release();
 
   if (plat === "darwin") {
-    // Parse macOS version from Darwin kernel version
-    // Darwin 23.x = macOS 14 Sonoma, 24.x = macOS 15 Sequoia, etc.
+    // Get macOS version from sw_vers command (accurate product version)
+    try {
+      const versionResult = spawnSync("sw_vers", ["-productVersion"], { encoding: "utf-8", timeout: 1000 });
+      if (versionResult.status === 0 && versionResult.stdout) {
+        const version = versionResult.stdout.trim();
+        const majorVersion = parseInt(version.split(".")[0] || "0");
+
+        // Try to get marketing name from macOS license file
+        try {
+          const nameResult = spawnSync("/bin/bash", [
+            "-c",
+            "cat /System/Library/CoreServices/Setup\\ Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf | awk -F 'macOS ' '/SOFTWARE LICENSE AGREEMENT FOR/ {print $NF}'"
+          ], { encoding: "utf-8", timeout: 1000 });
+
+          if (nameResult.status === 0 && nameResult.stdout) {
+            // Output format: "Tahoe 26\" -> parse to "26 Tahoe"
+            const nameOutput = nameResult.stdout.trim().replace(/\\$/, ""); // Remove trailing backslash
+            const parts = nameOutput.split(/\s+/);
+            if (parts.length >= 2) {
+              // Swap "Tahoe 26" to "26 Tahoe"
+              const name = parts[0];
+              return `macOS ${majorVersion} ${name}`;
+            }
+          }
+        } catch {
+          // If marketing name extraction fails, continue to fallback
+        }
+
+        // Fallback to just version number if name extraction failed
+        return `macOS ${version}`;
+      }
+    } catch {
+      // Fall back to Darwin version calculation if sw_vers fails
+    }
+
+    // Fallback: calculate from Darwin kernel version
     const majorVersion = parseInt(rel.split(".")[0] || "0");
     const macVersion = majorVersion - 9; // Darwin 20 = macOS 11
-    if (macVersion >= 15) {
-      return `macOS ${macVersion} Sequoia`;
-    } else if (macVersion >= 14) {
-      return `macOS ${macVersion} Sonoma`;
-    } else if (macVersion >= 13) {
-      return `macOS ${macVersion} Ventura`;
-    } else if (macVersion >= 12) {
-      return `macOS ${macVersion} Monterey`;
-    } else if (macVersion >= 11) {
-      return `macOS ${macVersion} Big Sur`;
-    }
     return `macOS ${macVersion}`;
   } else if (plat === "win32") {
     // Windows version detection
