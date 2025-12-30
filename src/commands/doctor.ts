@@ -7,6 +7,7 @@ import { cli, isVerbose, verbose } from "../utils/cli.js";
 import { isVagrantInstalled, vagrantSshSync, vagrantRunSync } from "../utils/vagrant.js";
 import { detectAvailableProvidersAsync, getCurrentProvider } from "../utils/providers.js";
 import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
+import { getBoxInfo, getGuestOsInfo, isUbuntuEol } from "../utils/box.js";
 
 // VVV version helpers
 function getVVVVersion(vvvPath: string): string {
@@ -350,6 +351,42 @@ function checkVmState(ctx: CheckContext): CheckResult[] {
 }
 
 // =============================================================================
+// BOX INFORMATION CHECKS
+// =============================================================================
+
+function checkBoxInfo(ctx: CheckContext): CheckResult[] {
+  const results: CheckResult[] = [];
+  const category = "Box Information";
+
+  // Check Vagrant box version
+  const boxInfo = getBoxInfo(ctx.vvvPath);
+  if (boxInfo) {
+    results.push(pass("Vagrant box version", category, `${boxInfo.name} (${boxInfo.version}) for ${boxInfo.provider}`));
+  } else {
+    results.push(fail("Vagrant box version", category, "Unable to detect box version"));
+  }
+
+  // Check guest OS version (only if VM is running)
+  if (ctx.vmRunning) {
+    const osInfo = getGuestOsInfo(ctx.vvvPath);
+    if (osInfo) {
+      const eol = isUbuntuEol(osInfo.version);
+      if (eol) {
+        results.push(warn("Guest OS version", category, `${osInfo.name} ${osInfo.version} (${osInfo.codename})`, "Ubuntu version is end-of-life. Consider upgrading with: vvvlocal box upgrade"));
+      } else {
+        results.push(pass("Guest OS version", category, `${osInfo.name} ${osInfo.version} (${osInfo.codename})`));
+      }
+    } else {
+      results.push(skip("Guest OS version", category, "Unable to detect guest OS version"));
+    }
+  } else {
+    results.push(skip("Guest OS version", category, "VM not running"));
+  }
+
+  return results;
+}
+
+// =============================================================================
 // SERVICES CHECKS
 // =============================================================================
 
@@ -652,6 +689,10 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   verbose("Checking VM state...");
   results.push(...checkVmState(ctx));
 
+  // Phase 4: Box Information
+  verbose("Checking box information...");
+  results.push(...checkBoxInfo(ctx));
+
   // Check for port conflicts when using Docker and VM is NOT running
   // (if VM is running, it's using those ports legitimately)
   if (!ctx.vmRunning && ctx.provider === "docker") {
@@ -681,23 +722,23 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
     return results;
   }
 
-  // Phase 4: Services (requires VM)
+  // Phase 5: Services (requires VM)
   verbose("Checking services...");
   results.push(...checkServices(ctx));
 
-  // Phase 5: Network (requires VM)
+  // Phase 6: Network (requires VM)
   verbose("Checking network...");
   results.push(...await checkNetwork(ctx));
 
-  // Phase 6: Database (requires VM)
+  // Phase 7: Database (requires VM)
   verbose("Checking database...");
   results.push(...checkDatabase(ctx));
 
-  // Phase 7: Configuration (can run without VM but more useful with)
+  // Phase 8: Configuration (can run without VM but more useful with)
   verbose("Checking configuration...");
   results.push(...checkConfiguration(ctx));
 
-  // Phase 8: Log files (requires VM)
+  // Phase 9: Log files (requires VM)
   verbose("Checking log files...");
   results.push(...checkLogFiles(ctx));
 
