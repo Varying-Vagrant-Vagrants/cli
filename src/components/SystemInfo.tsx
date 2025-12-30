@@ -3,6 +3,9 @@ import { Text, Box } from "ink";
 import { colors } from "../utils/theme.js";
 
 interface SystemInfoProps {
+  cliVersion: string;
+  cliBuildDate: string | null;
+  cliGitCommit: string | null;
   vvvVersion: string;
   latestVersion: string | null;
   vagrantVersion: string;
@@ -15,6 +18,9 @@ interface SystemInfoProps {
 }
 
 export function SystemInfo({
+  cliVersion,
+  cliBuildDate,
+  cliGitCommit,
   vvvVersion,
   latestVersion,
   vagrantVersion,
@@ -37,6 +43,12 @@ export function SystemInfo({
     return 0;
   };
 
+  const formatBuildDate = (date: string | null): string => {
+    if (!date) return "";
+    const d = new Date(date);
+    return d.toISOString().split("T")[0]; // YYYY-MM-DD
+  };
+
   const versionCompare = latestVersion ? compareVersions(vvvVersion, latestVersion) : 0;
   const isUpToDate = !latestVersion || versionCompare >= 0;
   const isNewer = latestVersion && versionCompare > 0;
@@ -49,6 +61,31 @@ export function SystemInfo({
       </Box>
 
       <Box>
+        <Box width={labelWidth}>
+          <Text bold color={colors.ui.label}>CLI Version</Text>
+        </Box>
+        <Text color={colors.data.value}>{cliVersion}</Text>
+      </Box>
+
+      {cliBuildDate && (
+        <Box>
+          <Box width={labelWidth}>
+            <Text bold color={colors.ui.label}>Build Date</Text>
+          </Box>
+          <Text color={colors.text.secondary}>{formatBuildDate(cliBuildDate)}</Text>
+        </Box>
+      )}
+
+      {cliGitCommit && (
+        <Box>
+          <Box width={labelWidth}>
+            <Text bold color={colors.ui.label}>Git Commit</Text>
+          </Box>
+          <Text color={colors.text.secondary}>{cliGitCommit}</Text>
+        </Box>
+      )}
+
+      <Box marginTop={1}>
         <Box width={labelWidth}>
           <Text bold color={colors.ui.label}>VVV Version</Text>
         </Box>

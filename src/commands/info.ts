@@ -8,8 +8,9 @@ import { render } from "ink";
 import { loadConfig, DEFAULT_VVV_PATH } from "../utils/config.js";
 import { ensureVvvExists, verbose } from "../utils/cli.js";
 import { SystemInfo } from "../components/SystemInfo.js";
+import { getCliVersion, getBuildDate, getGitCommit } from "../utils/version.js";
 
-function getVVVVersion(vvvPath: string): string {
+export function getVVVVersion(vvvPath: string): string {
   const versionFile = join(vvvPath, "version");
   if (existsSync(versionFile)) {
     return readFileSync(versionFile, "utf-8").trim();
@@ -210,6 +211,9 @@ export const infoCommand = new Command("info")
     verbose(`System info gathered in ${Date.now() - startTime}ms`);
 
     const info = {
+      cliVersion: getCliVersion(),
+      cliBuildDate: getBuildDate(),
+      cliGitCommit: getGitCommit(),
       vvvVersion,
       latestVersion,
       vagrantVersion,
