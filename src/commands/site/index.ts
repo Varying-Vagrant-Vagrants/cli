@@ -8,10 +8,12 @@ import { disableCommand } from "./disable.js";
 import { openCommand } from "./open.js";
 import { updateCommand } from "./update.js";
 import { wpCommand } from "./wp.js";
+import { cloneCommand } from "./clone.js";
 
 export const siteCommand = new Command("site")
   .description("Manage VVV sites")
   .addCommand(addCommand)
+  .addCommand(cloneCommand)
   .addCommand(disableCommand)
   .addCommand(enableCommand)
   .addCommand(infoCommand)

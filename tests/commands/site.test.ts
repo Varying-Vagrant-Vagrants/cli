@@ -83,6 +83,11 @@ describe("Site Command Group", () => {
       const options = addCmd?.options.map((o) => o.long) || [];
       expect(options).toContain("--description");
     });
+
+    test("has --no-provision option", () => {
+      const options = addCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--no-provision");
+    });
   });
 
   describe("remove subcommand", () => {
@@ -130,6 +135,55 @@ describe("Site Command Group", () => {
     test("requires site name argument", () => {
       const args = disableCmd?.registeredArguments || [];
       expect(args.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("clone subcommand", () => {
+    const cloneCmd = siteCommand.commands.find((c) => c.name() === "clone");
+
+    test("exists", () => {
+      expect(cloneCmd).toBeDefined();
+    });
+
+    test("requires source site argument", () => {
+      const args = cloneCmd?.registeredArguments || [];
+      expect(args.length).toBeGreaterThanOrEqual(2);
+      const sourceArg = args[0];
+      expect(sourceArg).toBeDefined();
+      expect(sourceArg!.name()).toBe("source");
+    });
+
+    test("requires new-name argument", () => {
+      const args = cloneCmd?.registeredArguments || [];
+      expect(args.length).toBeGreaterThanOrEqual(2);
+      const newNameArg = args[1];
+      expect(newNameArg).toBeDefined();
+      expect(newNameArg!.name()).toBe("new-name");
+    });
+
+    test("has --host option", () => {
+      const options = cloneCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--host");
+    });
+
+    test("has --skip-db option", () => {
+      const options = cloneCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--skip-db");
+    });
+
+    test("has --skip-files option", () => {
+      const options = cloneCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--skip-files");
+    });
+
+    test("has --path option", () => {
+      const options = cloneCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--path");
+    });
+
+    test("has --no-provision option", () => {
+      const options = cloneCmd?.options.map((o) => o.long) || [];
+      expect(options).toContain("--no-provision");
     });
   });
 });
