@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
 import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
 import { setTipsEnabledFromCli } from "./utils/tips.js";
-import { getCliVersion, getBuildDate, formatBuildDate, isCompiledBinary } from "./utils/version.js";
+import { getBuildDate, formatBuildDate, isCompiledBinary } from "./utils/version.js";
 import { VERSION } from "./version.js";
 import { getVVVVersion } from "./commands/info.js";
 import { DEFAULT_VVV_PATH, vvvExists, loadConfig } from "./utils/config.js";

@@ -46,7 +46,7 @@ export function SystemInfo({
   const formatBuildDate = (date: string | null): string => {
     if (!date) return "";
     const d = new Date(date);
-    return d.toISOString().split("T")[0]; // YYYY-MM-DD
+    return d.toISOString().split("T")[0] || ""; // YYYY-MM-DD
   };
 
   const versionCompare = latestVersion ? compareVersions(vvvVersion, latestVersion) : 0;
