@@ -314,12 +314,17 @@ program.addCommand(wpCommand);
 program.addCommand(xdebugCommand);
 
 // Better error handling for unknown commands
-program.showHelpAfterError('(add --help for additional information)');
+// Check if the first argument is an unknown command before parsing
+const args = process.argv.slice(2);
+if (args.length > 0 && !args[0].startsWith('-')) {
+  const potentialCommand = args[0];
+  const knownCommands = program.commands.map(cmd => [cmd.name(), ...(cmd.aliases() || [])]).flat();
 
-program.on('command:*', (operands) => {
-  console.error(`\nUnknown command: ${operands.join(' ')}`);
-  console.error(`\nRun 'vvvlocal --help' to see available commands.`);
-  process.exitCode = 1;
-});
+  if (!knownCommands.includes(potentialCommand)) {
+    console.error(`Unknown command: ${potentialCommand}`);
+    console.error(`\nRun 'vvvlocal --help' to see available commands.`);
+    process.exit(1);
+  }
+}
 
 program.parse();
