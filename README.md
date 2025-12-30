@@ -2,6 +2,53 @@
 
 A CLI tool for managing [VVV (Varying Vagrant Vagrants)](https://varyingvagrantvagrants.org/) installations.
 
+## Table of Contents
+
+- [Installation](#installation)
+  - [From a Release Binary](#from-a-release-binary)
+  - [From Source](#from-source)
+- [Commands](#commands)
+  - [VM Management](#vm-management)
+  - [Site Management](#site-management)
+  - [Extension Management](#extension-management)
+  - [Database Management](#database-management)
+  - [PHP](#php)
+  - [System](#system)
+- [Global Options](#global-options)
+- [Command Options](#command-options)
+- [Configuration](#configuration)
+- [Examples](#examples)
+  - [VM Management](#vm-management-1)
+  - [Site Management](#site-management-1)
+  - [Database Management](#database-management-1)
+  - [PHP & Debugging](#php--debugging)
+  - [Extensions](#extensions)
+  - [System Commands](#system-commands)
+- [Building](#building)
+- [Development](#development)
+- [Requirements](#requirements)
+- [Features](#features)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Quick Install
+
+Install the latest version with a single command:
+
+### macOS and Linux
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Varying-Vagrant-Vagrants/cli/main/install.sh | bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/Varying-Vagrant-Vagrants/cli/main/install.ps1 | iex
+```
+
+This will download and install the latest version of vvvlocal. Run the command again to upgrade to the latest version.
+
 ## Installation
 
 ### From a Release Binary
