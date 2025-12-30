@@ -1,66 +1,73 @@
 import { Command } from "commander";
-import { spawnSync } from "child_process";
-import { platform } from "os";
-import { DEFAULT_VVV_PATH, loadConfig } from "../../utils/config.js";
+import { DEFAULT_VVV_PATH, loadConfig, getSiteLocalPath } from "../../utils/config.js";
 import { ensureVvvExists, ensureSiteExists, cli, exitWithError } from "../../utils/cli.js";
-
-/**
- * Open a URL in the default browser using platform-specific commands.
- */
-function openUrl(url: string): boolean {
-  const plat = platform();
-  let cmd: string;
-  let args: string[];
-
-  if (plat === "darwin") {
-    cmd = "open";
-    args = [url];
-  } else if (plat === "win32") {
-    cmd = "cmd";
-    args = ["/c", "start", "", url];
-  } else {
-    // Linux and others
-    cmd = "xdg-open";
-    args = [url];
-  }
-
-  const result = spawnSync(cmd, args, { stdio: "inherit" });
-  return result.status === 0;
-}
+import { launchApplication, type LaunchTarget } from "../../utils/launcher.js";
 
 export const openCommand = new Command("open")
-  .description("Open a site in the browser")
+  .description("Open a site in browser, file manager, or editor")
   .argument("<site>", "Name of the site to open")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
+  .option("--folder", "Open in file manager (Finder/Explorer)")
+  .option("--vscode", "Open in VS Code editor")
+  .option("--code", "Alias for --vscode")
   .action((siteName, options) => {
     const vvvPath = options.path;
 
     ensureVvvExists(vvvPath);
     ensureSiteExists(vvvPath, siteName);
 
-    // Get site configuration
-    const config = loadConfig(vvvPath);
-    const site = config.sites?.[siteName];
+    // Determine launch target
+    const launchTarget: LaunchTarget = options.folder
+      ? "folder"
+      : (options.vscode || options.code)
+        ? "vscode"
+        : "browser";
 
-    if (!site?.hosts || site.hosts.length === 0) {
-      if (options.json) {
-        console.log(JSON.stringify({ success: false, error: `Site '${siteName}' has no hosts configured` }, null, 2));
-        process.exit(1);
+    if (launchTarget === "browser") {
+      // Get site configuration
+      const config = loadConfig(vvvPath);
+      const site = config.sites?.[siteName];
+
+      if (!site?.hosts || site.hosts.length === 0) {
+        if (options.json) {
+          console.log(JSON.stringify({ success: false, error: `Site '${siteName}' has no hosts configured` }, null, 2));
+          process.exit(1);
+        }
+        exitWithError(`Site '${siteName}' has no hosts configured.`);
       }
-      exitWithError(`Site '${siteName}' has no hosts configured.`);
-    }
 
-    // Use HTTPS for the first host
-    const url = `https://${site.hosts[0]}`;
+      // Use HTTPS for the first host
+      const url = `https://${site.hosts[0]}`;
 
-    if (options.json) {
-      console.log(JSON.stringify({ site: siteName, url, opened: true }, null, 2));
+      if (options.json) {
+        console.log(JSON.stringify({ site: siteName, url, opened: true }, null, 2));
+      } else {
+        cli.info(`Opening ${siteName} (${url})...`);
+      }
+
+      if (!launchApplication({ target: "browser", location: url })) {
+        exitWithError(`Failed to open browser for ${url}`);
+      }
     } else {
-      cli.info(`Opening ${siteName} (${url})...`);
-    }
+      // Open site directory in file manager or VS Code
+      const config = loadConfig(vvvPath);
+      const site = config.sites?.[siteName];
+      if (!site) {
+        exitWithError(`Site '${siteName}' not found`);
+      }
+      const sitePath = getSiteLocalPath(vvvPath, siteName, site);
 
-    if (!openUrl(url)) {
-      exitWithError(`Failed to open browser for ${url}`);
+      if (options.json) {
+        console.log(JSON.stringify({ site: siteName, path: sitePath, opened: true, launchTarget }, null, 2));
+      } else {
+        const targetDesc = launchTarget === "folder" ? "file manager" : "VS Code";
+        cli.info(`Opening ${siteName} in ${targetDesc}...`);
+      }
+
+      if (!launchApplication({ target: launchTarget, location: sitePath })) {
+        const targetDesc = launchTarget === "folder" ? "file manager" : "VS Code";
+        exitWithError(`Failed to open ${targetDesc} for ${sitePath}`);
+      }
     }
   });

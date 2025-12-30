@@ -1,8 +1,7 @@
 import { Command } from "commander";
-import { spawnSync } from "child_process";
-import { platform } from "os";
-import { DEFAULT_VVV_PATH, loadConfig } from "../utils/config.js";
+import { DEFAULT_VVV_PATH, loadConfig, getSiteLocalPath } from "../utils/config.js";
 import { ensureVvvExists, cli, exitWithError } from "../utils/cli.js";
+import { launchApplication, type LaunchTarget } from "../utils/launcher.js";
 
 // Built-in service URLs
 const SERVICES: Record<string, string> = {
@@ -12,29 +11,6 @@ const SERVICES: Record<string, string> = {
   mailcatcher: "http://vvv.test:1080",
 };
 
-/**
- * Open a URL in the default browser using platform-specific commands.
- */
-function openUrl(url: string): boolean {
-  const plat = platform();
-  let cmd: string;
-  let args: string[];
-
-  if (plat === "darwin") {
-    cmd = "open";
-    args = [url];
-  } else if (plat === "win32") {
-    cmd = "cmd";
-    args = ["/c", "start", "", url];
-  } else {
-    // Linux and others
-    cmd = "xdg-open";
-    args = [url];
-  }
-
-  const result = spawnSync(cmd, args, { stdio: "inherit" });
-  return result.status === 0;
-}
 
 /**
  * Get the URL for a site from its first host.
@@ -73,11 +49,14 @@ function getAvailableTargets(vvvPath: string): { sites: string[]; services: stri
 }
 
 export const openCommand = new Command("open")
-  .description("Open a site or service in the browser")
+  .description("Open a site or service in browser, file manager, or editor")
   .argument("[target]", "Site name or service (dashboard, phpmyadmin, mailhog)")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
   .option("-l, --list", "List available targets")
+  .option("--folder", "Open in file manager (Finder/Explorer)")
+  .option("--vscode", "Open in VS Code editor")
+  .option("--code", "Alias for --vscode")
   .action((target, options) => {
     const vvvPath = options.path;
 
@@ -116,33 +95,67 @@ export const openCommand = new Command("open")
     // At this point, target is guaranteed to be defined (we returned above if !target)
     const targetName = target as string;
 
+    // Determine launch target
+    const launchTarget: LaunchTarget = options.folder
+      ? "folder"
+      : (options.vscode || options.code)
+        ? "vscode"
+        : "browser";
+
     // Check if target is a service
     const serviceKey = targetName.toLowerCase();
     const serviceUrl = SERVICES[serviceKey];
     if (serviceUrl) {
+      if (launchTarget !== "browser") {
+        exitWithError("Services can only be opened in a browser");
+      }
+
       if (options.json) {
         console.log(JSON.stringify({ target: targetName, url: serviceUrl, type: "service", opened: true }, null, 2));
       } else {
         cli.info(`Opening ${targetName}...`);
       }
 
-      if (!openUrl(serviceUrl)) {
+      if (!launchApplication({ target: "browser", location: serviceUrl })) {
         exitWithError(`Failed to open browser for ${serviceUrl}`);
       }
       return;
     }
 
     // Try as a site name
-    const siteUrl = getSiteUrl(vvvPath, targetName);
-    if (siteUrl) {
+    if (launchTarget === "browser") {
+      const siteUrl = getSiteUrl(vvvPath, targetName);
+      if (siteUrl) {
+        if (options.json) {
+          console.log(JSON.stringify({ target: targetName, url: siteUrl, type: "site", opened: true }, null, 2));
+        } else {
+          cli.info(`Opening ${targetName}...`);
+        }
+
+        if (!launchApplication({ target: "browser", location: siteUrl })) {
+          exitWithError(`Failed to open browser for ${siteUrl}`);
+        }
+        return;
+      }
+    } else {
+      // Open site directory in file manager or VS Code
+      const config = loadConfig(vvvPath);
+      const site = config.sites?.[targetName];
+      if (!site) {
+        exitWithError(`Unknown target: ${targetName}`);
+      }
+      const sitePath = getSiteLocalPath(vvvPath, targetName, site);
+
       if (options.json) {
-        console.log(JSON.stringify({ target: targetName, url: siteUrl, type: "site", opened: true }, null, 2));
+        console.log(JSON.stringify({ target: targetName, path: sitePath, type: "site", opened: true, launchTarget }, null, 2));
       } else {
-        cli.info(`Opening ${targetName}...`);
+        const targetDesc = launchTarget === "folder" ? "file manager" : "VS Code";
+        cli.info(`Opening ${targetName} in ${targetDesc}...`);
       }
 
-      if (!openUrl(siteUrl)) {
-        exitWithError(`Failed to open browser for ${siteUrl}`);
+      if (!launchApplication({ target: launchTarget, location: sitePath })) {
+        const targetDesc = launchTarget === "folder" ? "file manager" : "VS Code";
+        exitWithError(`Failed to open ${targetDesc} for ${sitePath}`);
       }
       return;
     }
