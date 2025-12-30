@@ -1,4 +1,4 @@
-# vvvlocal
+# vvvlocal CLI
 
 A CLI tool for managing [VVV (Varying Vagrant Vagrants)](https://varyingvagrantvagrants.org/) installations.
 
