@@ -72,12 +72,6 @@ const TIPS: Tip[] = [
     contexts: ["site-add"],
   },
   {
-    id: "dns-propagation",
-    text: "It may take a moment for DNS changes to propagate.",
-    contexts: ["site-add"],
-    condition: "success",
-  },
-  {
     id: "site-clone-faster",
     text: "Cloning existing sites is faster than creating from scratch.",
     contexts: ["site-add"],
@@ -108,7 +102,7 @@ const TIPS: Tip[] = [
   },
   {
     id: "database-gui",
-    text: "Open databases in Sequel Pro or TablePlus: vvvlocal database sequel|tableplus",
+    text: "Open databases in Sequel Ace or TablePlus: vvvlocal database sequel|tableplus",
     contexts: ["database-list"],
   },
 
