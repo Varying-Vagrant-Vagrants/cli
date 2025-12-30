@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, boxCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
 import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
 import { setTipsEnabledFromCli } from "./utils/tips.js";
 import { getBuildDate, formatBuildDate, isCompiledBinary } from "./utils/version.js";
@@ -284,6 +284,7 @@ program.helpInformation = function() {
   return formatGroupedHelp(program);
 };
 
+program.addCommand(boxCommand);
 program.addCommand(completionCommand);
 program.addCommand(configCommand);
 program.addCommand(databaseCommand);
@@ -311,5 +312,14 @@ program.addCommand(upCommand);
 program.addCommand(upgradeCommand);
 program.addCommand(wpCommand);
 program.addCommand(xdebugCommand);
+
+// Better error handling for unknown commands
+program.showHelpAfterError('(add --help for additional information)');
+
+program.on('command:*', (operands) => {
+  console.error(`\nUnknown command: ${operands.join(' ')}`);
+  console.error(`\nRun 'vvvlocal --help' to see available commands.`);
+  process.exitCode = 1;
+});
 
 program.parse();
