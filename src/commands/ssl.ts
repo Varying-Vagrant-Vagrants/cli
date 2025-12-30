@@ -1,10 +1,11 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, copyFileSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { platform } from "os";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, cli, exitWithError } from "../utils/cli.js";
+import { ensureVvvExists, isVvvRunning, cli, exitWithError, confirm } from "../utils/cli.js";
+import { ensureVagrantInstalled, vagrantRun, vagrantProvisionWith } from "../utils/vagrant.js";
 
 /**
  * Get the local certificates directory path.
@@ -87,6 +88,49 @@ function trustCaLinux(certPath: string): boolean {
   // Update certificates
   const updateResult = spawnSync("sudo", ["update-ca-certificates"], { stdio: "inherit" });
   return updateResult.status === 0;
+}
+
+/**
+ * Remove the VVV CA certificate from the macOS system keychain.
+ */
+function untrustCaMac(): boolean {
+  const result = spawnSync("sudo", [
+    "security", "delete-certificate",
+    "-c", "VVV",
+    "/Library/Keychains/System.keychain",
+  ], { stdio: "inherit" });
+  return result.status === 0;
+}
+
+/**
+ * Remove the VVV CA certificate from Linux system certificates.
+ */
+function untrustCaLinux(): boolean {
+  const destPath = "/usr/local/share/ca-certificates/vvv-ca.crt";
+  if (!existsSync(destPath)) {
+    return true; // Already removed
+  }
+
+  const rmResult = spawnSync("sudo", ["rm", destPath], { stdio: "inherit" });
+  if (rmResult.status !== 0) {
+    return false;
+  }
+
+  const updateResult = spawnSync("sudo", ["update-ca-certificates"], { stdio: "inherit" });
+  return updateResult.status === 0;
+}
+
+/**
+ * Remove the VVV CA certificate from system trust store (platform-specific).
+ */
+function untrustCa(): boolean {
+  const plat = platform();
+  if (plat === "darwin") {
+    return untrustCaMac();
+  } else if (plat === "linux") {
+    return untrustCaLinux();
+  }
+  return false;
 }
 
 // List subcommand
@@ -283,8 +327,138 @@ const trustCommand = new Command("trust")
     }
   });
 
+// Refresh subcommand
+const refreshCommand = new Command("refresh")
+  .description("Regenerate the CA certificate and re-trust it")
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("-y, --yes", "Skip confirmation prompt")
+  .option("--json", "Output as JSON")
+  .action(async (options) => {
+    const vvvPath = options.path;
+
+    ensureVvvExists(vvvPath);
+    ensureVagrantInstalled();
+
+    // Check if VVV is running
+    if (!isVvvRunning(vvvPath)) {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: "VVV is not running" }, null, 2));
+        process.exit(1);
+      }
+
+      cli.warning("VVV is not running.");
+      const shouldStart = await confirm("Would you like to start VVV?");
+      if (!shouldStart) {
+        cli.info("Cannot refresh certificates without VVV running.");
+        return;
+      }
+
+      cli.info("Starting VVV...");
+      const upCode = await vagrantRun(["up"], vvvPath);
+      if (upCode !== 0) {
+        if (options.json) {
+          console.log(JSON.stringify({ success: false, error: "Failed to start VVV" }, null, 2));
+          process.exit(1);
+        }
+        exitWithError("Failed to start VVV");
+      }
+    }
+
+    // Confirm regeneration (destructive action)
+    if (!options.yes && !options.json) {
+      const confirmed = await confirm("This will regenerate SSL certificates. Continue?");
+      if (!confirmed) {
+        cli.info("Cancelled.");
+        return;
+      }
+    }
+
+    // Remove old trust if present
+    if (isCaTrusted()) {
+      if (!options.json) {
+        cli.info("Removing old CA certificate from keychain...");
+      }
+      untrustCa();
+    }
+
+    // Run tls-ca provisioner to regenerate certificates
+    if (!options.json) {
+      cli.info("Regenerating CA certificate...");
+    }
+    const provisionCode = await vagrantProvisionWith(["extension-core-tls-ca"], vvvPath);
+    if (provisionCode !== 0) {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: "Failed to regenerate CA certificate" }, null, 2));
+        process.exit(1);
+      }
+      exitWithError("Failed to regenerate CA certificate");
+    }
+
+    // Trust the new certificate
+    const caPath = getCaPath(vvvPath);
+    if (!existsSync(caPath)) {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: "CA certificate was not generated" }, null, 2));
+        process.exit(1);
+      }
+      exitWithError("CA certificate was not generated. Check the provisioner output.");
+    }
+
+    if (!options.json) {
+      cli.info("Trusting new CA certificate...");
+    }
+
+    const plat = platform();
+    let trustSuccess = false;
+
+    if (plat === "darwin") {
+      trustSuccess = trustCaMac(caPath);
+    } else if (plat === "linux") {
+      trustSuccess = trustCaLinux(caPath);
+    } else if (plat === "win32") {
+      if (options.json) {
+        console.log(JSON.stringify({
+          success: true,
+          message: "CA regenerated. Manual trust required on Windows.",
+          caPath,
+        }, null, 2));
+        return;
+      }
+      cli.success("CA certificate regenerated.");
+      cli.warning("Windows certificate trust requires manual steps:");
+      console.log("");
+      console.log(`1. Open the CA certificate: ${caPath}`);
+      console.log("");
+      console.log("2. Double-click the certificate and install to 'Trusted Root Certification Authorities'");
+      console.log("");
+      return;
+    } else {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: `Unsupported platform: ${plat}` }, null, 2));
+        process.exit(1);
+      }
+      exitWithError(`Unsupported platform: ${plat}`);
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify({ success: trustSuccess, platform: plat }, null, 2));
+      process.exit(trustSuccess ? 0 : 1);
+    }
+
+    if (trustSuccess) {
+      console.log("");
+      cli.success("CA certificate refreshed and trusted.");
+      cli.info("You may need to restart your browser for changes to take effect.");
+      console.log("");
+    } else {
+      cli.error("CA was regenerated but failed to trust.");
+      process.exit(1);
+    }
+  });
+
 export const sslCommand = new Command("ssl")
   .description("Manage SSL certificates")
   .addCommand(listCommand)
   .addCommand(statusCommand)
-  .addCommand(trustCommand);
+  .addCommand(trustCommand)
+  .addCommand(refreshCommand);
