@@ -6,6 +6,7 @@ import { join } from "path";
 import { cli, askQuestion, confirm, exitWithError, startTimer } from "../utils/cli.js";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { type Provider, detectAvailableProvidersAsync } from "../utils/providers.js";
+import { findGoodhostsBinary, isSudoersConfigured } from "./hosts/sudoers.js";
 
 function isVagrantInstalled(): boolean {
   const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8" });
@@ -197,6 +198,63 @@ export const installCommand = new Command("install")
 
     if (pluginResult.status === 0) {
       cli.success("Vagrant plugins installed");
+
+      // Step 7b: Offer to configure passwordless hosts file access
+      if (!isSudoersConfigured()) {
+        const goodhostsBinary = findGoodhostsBinary(targetPath);
+        if (goodhostsBinary) {
+          console.log("");
+          cli.info("vagrant-goodhosts plugin detected.");
+          console.log("");
+          console.log("VVV modifies your hosts file to map hostnames like 'mysite.test' to the VM.");
+          console.log("By default, this requires entering your password each time you start VVV.");
+          console.log("");
+
+          const setupSudoers = await confirm(
+            "Would you like to configure passwordless hosts file access?"
+          );
+
+          if (setupSudoers) {
+            console.log("");
+            cli.info("You can configure this now or later with: vvvlocal hosts sudoers");
+            console.log("");
+
+            // Generate sudoers content
+            const group = platform() === "darwin" ? "%admin" : "%sudo";
+            const sudoersContent = `${group} ALL=(root) NOPASSWD: ${goodhostsBinary}\n`;
+
+            // Validate and install
+            const validateResult = spawnSync("sudo", ["visudo", "-c", "-f", "-"], {
+              input: sudoersContent,
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"],
+            });
+
+            if (validateResult.status === 0) {
+              const teeResult = spawnSync("sudo", ["tee", "/etc/sudoers.d/goodhosts"], {
+                input: sudoersContent,
+                encoding: "utf-8",
+                stdio: ["pipe", "pipe", "pipe"],
+              });
+
+              if (teeResult.status === 0) {
+                spawnSync("sudo", ["chmod", "440", "/etc/sudoers.d/goodhosts"], {
+                  encoding: "utf-8",
+                  stdio: ["pipe", "pipe", "pipe"],
+                });
+                cli.success("Passwordless hosts file access configured");
+              } else {
+                cli.warning("Could not configure sudoers. You can try later with: vvvlocal hosts sudoers");
+              }
+            } else {
+              cli.warning("Sudoers validation failed. You can try later with: vvvlocal hosts sudoers");
+            }
+          } else {
+            console.log("");
+            cli.info("You can configure this later with: vvvlocal hosts sudoers");
+          }
+        }
+      }
     } else {
       cli.warning("Failed to install Vagrant plugins. You may need to run 'vagrant plugin install --local' manually.");
     }

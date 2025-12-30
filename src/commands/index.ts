@@ -12,6 +12,7 @@ export { extensionCommand } from "./extension/index.js";
 export { databaseCommand } from "./database/index.js";
 export { phpCommand } from "./php/index.js";
 export { configCommand } from "./config/index.js";
+export { hostsCommand } from "./hosts/index.js";
 export { logsCommand } from "./logs.js";
 export { openCommand } from "./open.js";
 export { serviceCommand } from "./service.js";
