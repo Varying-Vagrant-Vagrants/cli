@@ -7,6 +7,7 @@ import { cli, askQuestion, confirm, exitWithError, startTimer } from "../utils/c
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { type Provider, detectAvailableProvidersAsync } from "../utils/providers.js";
 import { findGoodhostsBinary, isSudoersConfigured } from "./hosts/sudoers.js";
+import { displayTip } from "../utils/tips.js";
 
 function isVagrantInstalled(): boolean {
   const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8" });
@@ -278,4 +279,5 @@ export const installCommand = new Command("install")
     cli.bold(`  vvvlocal up`);
     console.log("");
     console.log("The first boot will take some time as it downloads and configures the VM.");
+    displayTip("install", "success", targetPath);
   });

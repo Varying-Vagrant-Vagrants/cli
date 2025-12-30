@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
-import { ensureVvvExists, exitWithError } from "../utils/cli.js";
+import { ensureVvvExists, exitWithError, cli, startTimer } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
+import { displayTip } from "../utils/tips.js";
 
 export const restartCommand = new Command("restart")
   .alias("reload")
@@ -13,13 +14,27 @@ export const restartCommand = new Command("restart")
     ensureVvvExists(vvvPath);
     ensureVagrantInstalled();
 
-    console.log("Stopping VVV...");
+    const getElapsed = startTimer();
+
+    cli.info("Restarting VVV (this usually takes 1-2 minutes)...");
+    console.log("");
+
     const haltCode = await vagrantRun(["halt"], vvvPath);
     if (haltCode !== 0) {
       exitWithError("Failed to stop VVV");
     }
 
-    console.log("\nStarting VVV...");
+    console.log("");
     const upCode = await vagrantRun(["up"], vvvPath);
+    const elapsed = getElapsed();
+
+    console.log("");
+    if (upCode === 0) {
+      cli.success(`VVV restarted successfully (${elapsed})`);
+      displayTip("restart", "success", vvvPath);
+    } else {
+      cli.error(`Failed to restart VVV (${elapsed})`);
+    }
+
     process.exit(upCode);
   });

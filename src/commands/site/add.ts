@@ -4,6 +4,7 @@ import { parseDocument } from "yaml";
 import { getConfigPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ensureVvvExists, ensureSiteNotExists, askQuestion, cli, exitWithError, getVmState, startTimer } from "../../utils/cli.js";
 import { vagrantRun, vagrantProvisionWith } from "../../utils/vagrant.js";
+import { displayTip } from "../../utils/tips.js";
 
 function addSiteToConfig(
   vvvPath: string,
@@ -157,9 +158,9 @@ export const addCommand = new Command("add")
         const elapsed = getElapsed();
         console.log("");
         if (upCode === 0) {
-          cli.success(`Site '${name}' created successfully! (${elapsed})`);
-          console.log("");
+          cli.success(`Site '${name}' is ready! (${elapsed})`);
           console.log(`  URL: https://${hosts[0]}/`);
+          displayTip("site-add", "success", vvvPath);
         } else {
           cli.error(`Provisioning failed (${elapsed})`);
           process.exit(upCode);
@@ -179,7 +180,7 @@ export const addCommand = new Command("add")
         }
 
         console.log("");
-        cli.info("Provisioning site...");
+        cli.info("Provisioning the new site (this usually takes 1-2 minutes)...");
         console.log("");
         const provisionCode = await vagrantProvisionWith(
           [`site-${name}`, "extension-core-tls-ca"],
@@ -188,9 +189,9 @@ export const addCommand = new Command("add")
         const elapsed = getElapsed();
         console.log("");
         if (provisionCode === 0) {
-          cli.success(`Site '${name}' created successfully! (${elapsed})`);
-          console.log("");
+          cli.success(`Site '${name}' is ready! (${elapsed})`);
           console.log(`  URL: https://${hosts[0]}/`);
+          displayTip("site-add", "success", vvvPath);
         } else {
           cli.error(`Provisioning failed (${elapsed})`);
           process.exit(provisionCode);

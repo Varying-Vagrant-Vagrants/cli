@@ -4,6 +4,7 @@ import { ensureVvvExists, cli, startTimer, isVvvRunning } from "../utils/cli.js"
 import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 import { getCurrentProvider } from "../utils/providers.js";
 import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
+import { displayTip } from "../utils/tips.js";
 
 export const upCommand = new Command("up")
   .alias("start")
@@ -40,7 +41,13 @@ export const upCommand = new Command("up")
       args.push("--provision");
     }
 
-    cli.info(`Starting VVV${options.provision ? " with provisioning" : ""}...`);
+    // Add context about timing
+    const isFirstBoot = !alreadyRunning;
+    const timingContext = isFirstBoot
+      ? " (this usually takes 2-3 minutes)"
+      : " (this usually takes 1-2 minutes)";
+
+    cli.info(`Starting VVV${options.provision ? " with provisioning" : ""}${timingContext}...`);
     console.log("");
 
     const getElapsed = startTimer();
@@ -49,7 +56,8 @@ export const upCommand = new Command("up")
 
     console.log("");
     if (code === 0) {
-      cli.success(`VVV started successfully (${elapsed})`);
+      cli.success(`VVV is ready (${elapsed})`);
+      displayTip("up", "success", vvvPath);
     } else {
       cli.error(`Failed to start VVV (${elapsed})`);
     }
