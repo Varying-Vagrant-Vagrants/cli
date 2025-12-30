@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { readFileSync, writeFileSync } from "fs";
 import { parseDocument } from "yaml";
 import { getConfigPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
-import { ensureVvvExists, ensureSiteNotExists, askQuestion, cli, exitWithError } from "../../utils/cli.js";
+import { ensureVvvExists, ensureSiteNotExists, askQuestion, cli, exitWithError, getVmState, startTimer } from "../../utils/cli.js";
+import { vagrantRun, vagrantProvisionWith } from "../../utils/vagrant.js";
 
 function addSiteToConfig(
   vvvPath: string,
@@ -61,6 +62,7 @@ export const addCommand = new Command("add")
   .option("--local-dir <path>", "Custom local directory path (requires --vm-dir)")
   .option("--vm-dir <path>", "Custom VM directory path (requires --local-dir)")
   .option("-y, --yes", "Skip interactive prompts and use defaults")
+  .option("--no-provision", "Skip provisioning after adding the site")
   .action(async (name, options) => {
     const vvvPath = options.path;
 
@@ -121,7 +123,7 @@ export const addCommand = new Command("add")
         vmDir,
       });
 
-      cli.success(`\nSite '${name}' added successfully!`);
+      cli.success(`Site '${name}' added to config`);
       console.log("");
       console.log("Site configuration:");
       console.log(`  Hosts: ${hosts.join(", ")}`);
@@ -135,8 +137,65 @@ export const addCommand = new Command("add")
         console.log(`  Local path: ${localDir}`);
         console.log(`  VM path: ${vmDir}`);
       }
-      console.log("");
-      cli.warning(`Note: Run ${cli.format.bold("vvvlocal reprovision")} to create the site.`);
+
+      // Handle provisioning based on VM state
+      if (options.provision === false) {
+        console.log("");
+        cli.warning(`Run ${cli.format.bold("vvvlocal reprovision")} to create the site.`);
+        return;
+      }
+
+      const vmState = getVmState(vvvPath);
+      const getElapsed = startTimer();
+
+      if (vmState === "not_created") {
+        // Fresh VVV - need full provisioning via vagrant up
+        console.log("");
+        cli.info("VM not yet created. Running vagrant up (this will provision everything)...");
+        console.log("");
+        const upCode = await vagrantRun(["up"], vvvPath);
+        const elapsed = getElapsed();
+        console.log("");
+        if (upCode === 0) {
+          cli.success(`Site '${name}' created successfully! (${elapsed})`);
+          console.log("");
+          console.log(`  URL: https://${hosts[0]}/`);
+        } else {
+          cli.error(`Provisioning failed (${elapsed})`);
+          process.exit(upCode);
+        }
+      } else {
+        // VM exists - use targeted provisioning
+        if (vmState !== "running") {
+          console.log("");
+          cli.info("Starting VM...");
+          console.log("");
+          const upCode = await vagrantRun(["up"], vvvPath);
+          if (upCode !== 0) {
+            cli.error("Failed to start VM");
+            process.exit(upCode);
+          }
+          console.log("");
+        }
+
+        console.log("");
+        cli.info("Provisioning site...");
+        console.log("");
+        const provisionCode = await vagrantProvisionWith(
+          [`site-${name}`, "extension-core-tls-ca"],
+          vvvPath
+        );
+        const elapsed = getElapsed();
+        console.log("");
+        if (provisionCode === 0) {
+          cli.success(`Site '${name}' created successfully! (${elapsed})`);
+          console.log("");
+          console.log(`  URL: https://${hosts[0]}/`);
+        } else {
+          cli.error(`Provisioning failed (${elapsed})`);
+          process.exit(provisionCode);
+        }
+      }
     } catch (error) {
       exitWithError(`Failed to add site: ${error}`);
     }

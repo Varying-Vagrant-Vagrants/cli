@@ -225,3 +225,15 @@ export function getUserDatabases(vvvPath: string): string[] {
     return true;
   });
 }
+
+/**
+ * Run targeted vagrant provisioners.
+ * More efficient than full provision when only specific provisioners are needed.
+ */
+export function vagrantProvisionWith(
+  provisioners: string[],
+  vvvPath: string
+): Promise<number> {
+  const provisionArg = provisioners.join(",");
+  return vagrantRun(["provision", `--provision-with=${provisionArg}`], vvvPath);
+}
