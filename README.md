@@ -2,8 +2,10 @@
 
 A CLI tool for managing [VVV (Varying Vagrant Vagrants)](https://varyingvagrantvagrants.org/) installations.
 
-## Table of Contents
+<details>
+<summary>Table of Contents</summary>
 
+- [Quick Install](#quick-install)
 - [Installation](#installation)
   - [From a Release Binary](#from-a-release-binary)
   - [From Source](#from-source)
@@ -30,6 +32,8 @@ A CLI tool for managing [VVV (Varying Vagrant Vagrants)](https://varyingvagrantv
 - [Features](#features)
 - [Contributing](#contributing)
 - [License](#license)
+
+</details>
 
 ## Quick Install
 
