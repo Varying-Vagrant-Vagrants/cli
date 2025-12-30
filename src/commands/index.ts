@@ -20,6 +20,7 @@ export { snapshotCommand } from "./snapshot.js";
 export { sslCommand } from "./ssl.js";
 export { wpCommand } from "./wp.js";
 export { xdebugCommand } from "./xdebug.js";
+export { boxCommand } from "./box/index.js";
 export { installCommand } from "./install.js";
 export { providersCommand } from "./providers.js";
 export { upgradeCommand } from "./upgrade.js";
