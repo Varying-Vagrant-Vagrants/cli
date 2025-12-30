@@ -4,6 +4,7 @@ import { render } from "ink";
 import { loadConfig, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ensureVvvExists, exitWithError } from "../../utils/cli.js";
 import { SiteTable } from "../../components/SiteTable.js";
+import { shortenPath } from "../../utils/paths.js";
 
 export const listCommand = new Command("list")
   .description("List all VVV sites")
@@ -30,17 +31,26 @@ export const listCommand = new Command("list")
 
       const siteList = Object.entries(sites)
         .filter(([_, site]) => options.all || site.skip_provisioning !== true)
-        .map(([name, site]) => ({
-          name,
-          hosts: site.hosts || [],
-          description: site.description,
-          php: site.php,
-          skipped: site.skip_provisioning === true,
-          path: getSiteLocalPath(vvvPath, name, site),
-        }));
+        .map(([name, site]) => {
+          const fullPath = getSiteLocalPath(vvvPath, name, site);
+          return {
+            name,
+            description: site.description,
+            hosts: site.hosts || [],
+            php: site.php,
+            skipped: site.skip_provisioning === true,
+            path: shortenPath(fullPath, vvvPath),
+          };
+        });
 
       if (options.json) {
-        console.log(JSON.stringify(siteList, null, 2));
+        // For JSON, ensure all fields are present (use null instead of undefined)
+        const jsonList = siteList.map((site) => ({
+          ...site,
+          description: site.description ?? null,
+          php: site.php ?? null,
+        }));
+        console.log(JSON.stringify(jsonList, null, 2));
         return;
       }
 
