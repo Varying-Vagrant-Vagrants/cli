@@ -11,6 +11,7 @@ import { wpCommand } from "./wp.js";
 import { cloneCommand } from "./clone.js";
 
 export const siteCommand = new Command("site")
+  .alias("sites")
   .description("Manage VVV sites")
   .addCommand(addCommand)
   .addCommand(cloneCommand)
