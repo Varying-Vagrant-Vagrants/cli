@@ -13,8 +13,8 @@ Thank you for your interest in contributing to vvvlocal! This guide will help yo
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/vvv-cli.git
-cd vvv-cli
+git clone https://github.com/Varying-Vagrant-Vagrants/cli.git
+cd cli
 
 # Install dependencies
 bun install

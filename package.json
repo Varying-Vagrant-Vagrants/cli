@@ -1,7 +1,26 @@
 {
   "name": "vvvlocal",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "CLI tool for VVV (Varying Vagrant Vagrants)",
+  "author": "Varying Vagrant Vagrants",
+  "license": "MIT",
+  "homepage": "https://github.com/Varying-Vagrant-Vagrants/cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Varying-Vagrant-Vagrants/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Varying-Vagrant-Vagrants/cli/issues"
+  },
+  "keywords": [
+    "vvv",
+    "vagrant",
+    "wordpress",
+    "development",
+    "cli",
+    "local-development",
+    "varying-vagrant-vagrants"
+  ],
   "module": "src/index.ts",
   "type": "module",
   "bin": {
@@ -9,7 +28,7 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
-    "postinstall": "test -f src/version.ts || echo 'export const VERSION=\"0.1.0\"; export const BUILD_DATE=null; export const IS_COMPILED=false; export const GIT_COMMIT=null;' > src/version.ts",
+    "postinstall": "test -f src/version.ts || echo 'export const VERSION=\"1.0.0\"; export const BUILD_DATE=null; export const IS_COMPILED=false; export const GIT_COMMIT=null;' > src/version.ts",
     "generate-version": "bun run scripts/generate-version.ts",
     "prebuild": "bun run generate-version",
     "build": "bun run build:all",
