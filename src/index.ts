@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
 import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
+import { setTipsEnabledFromCli } from "./utils/tips.js";
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, _promise) => {
@@ -222,12 +223,16 @@ program
   .description("CLI tool for VVV (Varying Vagrant Vagrants)")
   .version("0.1.0")
   .option("--verbose", "Show detailed output")
+  .option("--no-tips", "Disable helpful tips")
   .addHelpText("beforeAll", () => getLogo())
   .addHelpCommand(false) // Disable help subcommand
   .hook("preAction", (thisCommand) => {
     const opts = thisCommand.opts();
     if (opts.verbose) {
       setVerboseMode(true);
+    }
+    if (opts.tips === false) {
+      setTipsEnabledFromCli(false);
     }
   })
   .action(() => {

@@ -10,6 +10,11 @@ export interface VVVConfig {
   extensions?: Record<string, string[]>;
   vm_config?: Record<string, unknown>;
   general?: Record<string, unknown>;
+  cli?: CliConfig;
+}
+
+export interface CliConfig {
+  tips?: boolean;
 }
 
 export interface SiteConfig {
@@ -52,6 +57,19 @@ export function loadConfig(vvvPath: string): VVVConfig {
 
   const content = readFileSync(configPath, "utf-8");
   return parse(content) as VVVConfig;
+}
+
+/**
+ * Get CLI configuration with defaults.
+ * Returns empty object if VVV is not set up yet or config is missing.
+ */
+export function getCliConfig(vvvPath: string): CliConfig {
+  try {
+    const config = loadConfig(vvvPath);
+    return config.cli || {};
+  } catch {
+    return {};
+  }
 }
 
 export function vvvExists(vvvPath: string): boolean {
