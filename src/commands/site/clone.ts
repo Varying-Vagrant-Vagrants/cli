@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { readFileSync, writeFileSync } from "fs";
-import { parseDocument, YAMLMap } from "yaml";
+import { parseDocument, type YAMLMap } from "yaml";
 import { getConfigPath, loadConfig, getSiteVmPath, DEFAULT_VVV_PATH, type SiteConfig } from "../../utils/config.js";
 import { ensureVvvExists, ensureVvvRunning, ensureSiteExists, ensureSiteNotExists, cli, exitWithError, startTimer } from "../../utils/cli.js";
 import { vagrantSshSync, vagrantProvisionWith } from "../../utils/vagrant.js";

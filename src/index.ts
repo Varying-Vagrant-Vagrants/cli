@@ -4,7 +4,7 @@ import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionComma
 import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason, _promise) => {
   cli.error("An unexpected error occurred.");
   if (reason instanceof Error) {
     console.error(`Error: ${reason.message}`);

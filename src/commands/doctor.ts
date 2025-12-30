@@ -429,7 +429,7 @@ async function checkNetwork(ctx: CheckContext): Promise<CheckResult[]> {
     } else {
       results.push(fail("Dashboard", category, `vvv.test returned ${response.status}`, "Check nginx configuration"));
     }
-  } catch (e) {
+  } catch {
     results.push(fail("Dashboard", category, "Cannot reach vvv.test", "Check hosts file and run: vvvlocal up --provision"));
   }
 
@@ -459,7 +459,7 @@ async function checkNetwork(ctx: CheckContext): Promise<CheckResult[]> {
     } else {
       results.push(fail("Hosts file", category, `${missingHosts.length} hosts missing from /etc/hosts`, "Run: vvvlocal up --provision"));
     }
-  } catch (e) {
+  } catch {
     results.push(warn("Hosts file", category, "Could not check hosts file"));
   }
 
@@ -539,7 +539,7 @@ function checkConfiguration(ctx: CheckContext): CheckResult[] {
     const duplicateHosts: string[] = [];
     let sitesWithoutHosts = 0;
 
-    for (const [siteName, siteConfig] of Object.entries(config.sites)) {
+    for (const [_siteName, siteConfig] of Object.entries(config.sites)) {
       if (siteConfig.skip_provisioning) continue;
 
       // Check hosts defined
@@ -569,7 +569,7 @@ function checkConfiguration(ctx: CheckContext): CheckResult[] {
       results.push(pass("Duplicate hosts", category, "No duplicate hosts"));
     }
 
-  } catch (e) {
+  } catch {
     results.push(skip("Configuration", category, "Could not load config"));
   }
 

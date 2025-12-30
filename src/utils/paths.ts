@@ -3,7 +3,7 @@
  */
 
 import { homedir, platform } from "os";
-import { relative, isAbsolute } from "path";
+import { relative } from "path";
 
 /**
  * Shorten a path for display:

@@ -6,7 +6,7 @@ import { ensureVagrantInstalled, vagrantRunAndExit } from "../utils/vagrant.js";
 export const stopCommand = new Command("stop")
   .alias("halt")
   .description("Stop VVV")
-  .option("--path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .action((options) => {
     const vvvPath = options.path;
 

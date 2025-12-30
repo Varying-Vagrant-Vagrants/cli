@@ -14,7 +14,7 @@ import { ensureVagrantInstalled, vagrantRunAndExit } from "../utils/vagrant.js";
  */
 function getVmPathForLocalPath(localPath: string, vvvPath: string): string | null {
   const resolvedLocal = resolve(localPath);
-  const resolvedVvv = resolve(vvvPath);
+  const _resolvedVvv = resolve(vvvPath);
   const wwwPath = resolve(vvvPath, "www");
 
   // Check if the current path is inside VVV's www directory

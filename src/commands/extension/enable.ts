@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { vvvExists, enableExtension, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 export const enableCommand = new Command("enable")
   .description("Enable an extension provisioner")
@@ -9,24 +10,24 @@ export const enableCommand = new Command("enable")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     const parts = extProvisioner.split("/");
     if (parts.length !== 2) {
-      console.error("Invalid format. Use: extension/provisioner (e.g., core/phpmyadmin)");
-      process.exit(1);
+      exitWithError(
+        "Invalid format.",
+        "Use: extension/provisioner (e.g., core/phpmyadmin)"
+      );
     }
 
     const [extension, provisioner] = parts;
 
     try {
       enableExtension(vvvPath, extension, provisioner);
-      console.log(`Extension '${extension}/${provisioner}' enabled.`);
-      console.log("Run 'vvvlocal up --provision' to provision the extension.");
+      cli.success(`Extension '${extension}/${provisioner}' enabled.`);
+      cli.info("Run 'vvvlocal up --provision' to provision the extension.");
     } catch (error) {
-      console.error(`Error: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError((error as Error).message);
     }
   });

@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import { existsSync } from "fs";
 import { join } from "path";
 import { vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 export const sequelCommand = new Command("sequel")
   .aliases(["sequelace", "sequelpro"])
@@ -12,19 +13,19 @@ export const sequelCommand = new Command("sequel")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     const spfPath = join(vvvPath, "database", "sequelpro.spf");
 
     if (!existsSync(spfPath)) {
-      console.error("Sequel Pro/Ace connection file not found.");
-      console.error(`Expected at: ${spfPath}`);
-      process.exit(1);
+      exitWithError(
+        "Sequel Pro/Ace connection file not found.",
+        `Expected at: ${spfPath}`
+      );
     }
 
-    console.log("Opening Sequel Ace...");
+    cli.info("Opening Sequel Ace...");
 
     // Use 'open' on macOS to open the .spf file with the default handler
     const child = spawn("open", [spfPath], {

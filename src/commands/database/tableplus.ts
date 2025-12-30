@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 function getConnectionDetails(vvvPath: string): {
   host: string;
@@ -49,8 +50,7 @@ export const tableplusCommand = new Command("tableplus")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     const { host, port, user, password } = getConnectionDetails(vvvPath);
@@ -59,7 +59,7 @@ export const tableplusCommand = new Command("tableplus")
     // TablePlus URL scheme: mysql://user:password@host:port/database
     const url = `mysql://${user}:${password}@${host}:${port}/${database}?statusColor=007F3D&environment=local&name=VVV`;
 
-    console.log("Opening TablePlus...");
+    cli.info("Opening TablePlus...");
 
     // Use 'open' on macOS to open the URL with TablePlus
     const child = spawn("open", [url], {

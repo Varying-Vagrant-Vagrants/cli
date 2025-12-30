@@ -2,7 +2,7 @@ import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
 import { loadConfig, getSiteLocalPath, DEFAULT_VVV_PATH } from "../../utils/config.js";
-import { ensureVvvExists, exitWithError } from "../../utils/cli.js";
+import { ensureVvvExists, exitWithError, cli } from "../../utils/cli.js";
 import { SiteTable } from "../../components/SiteTable.js";
 import { shortenPath } from "../../utils/paths.js";
 
@@ -22,9 +22,9 @@ export const listCommand = new Command("list")
 
       if (!sites || Object.keys(sites).length === 0) {
         if (options.json) {
-          console.log(JSON.stringify([], null, 2));
+          console.log(JSON.stringify({ success: true, data: [] }, null, 2));
         } else {
-          console.log("No sites configured.");
+          cli.info("No sites configured.");
         }
         return;
       }
@@ -50,7 +50,7 @@ export const listCommand = new Command("list")
           description: site.description ?? null,
           php: site.php ?? null,
         }));
-        console.log(JSON.stringify(jsonList, null, 2));
+        console.log(JSON.stringify({ success: true, data: jsonList }, null, 2));
         return;
       }
 

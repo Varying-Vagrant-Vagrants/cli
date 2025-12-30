@@ -6,7 +6,7 @@ import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 export const reprovisionCommand = new Command("reprovision")
   .alias("provision")
   .description("Reprovision VVV (starts VVV if not running)")
-  .option("--path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .action(async (options) => {
     const vvvPath = options.path;
 

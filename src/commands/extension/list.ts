@@ -5,6 +5,7 @@ import React from "react";
 import { render } from "ink";
 import { loadConfig, vvvExists, DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ExtensionTable } from "../../components/ExtensionTable.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 interface ExtensionInfo {
   extension: string;
@@ -80,8 +81,7 @@ export const listCommand = new Command("list")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     const installed = getInstalledExtensions(vvvPath);
@@ -112,15 +112,15 @@ export const listCommand = new Command("list")
 
     if (extList.length === 0) {
       if (options.json) {
-        console.log(JSON.stringify([], null, 2));
+        console.log(JSON.stringify({ success: true, data: [] }, null, 2));
       } else {
-        console.log("No extensions installed.");
+        cli.info("No extensions installed.");
       }
       return;
     }
 
     if (options.json) {
-      console.log(JSON.stringify(extList, null, 2));
+      console.log(JSON.stringify({ success: true, data: extList }, null, 2));
       return;
     }
 

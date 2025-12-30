@@ -21,7 +21,7 @@ function isGitInstall(vvvPath: string): boolean {
   return existsSync(join(vvvPath, ".git"));
 }
 
-function getGitBranch(vvvPath: string): string | null {
+function _getGitBranch(vvvPath: string): string | null {
   if (!isGitInstall(vvvPath)) {
     return null;
   }
@@ -86,7 +86,7 @@ async function getLatestVVVVersion(): Promise<string | null> {
   return null;
 }
 
-function getVagrantVersion(): string {
+function _getVagrantVersion(): string {
   const result = spawnSync("vagrant", ["--version"], { encoding: "utf-8", timeout: 5000 });
   if (result.status === 0) {
     // Output is like "Vagrant 2.4.1"

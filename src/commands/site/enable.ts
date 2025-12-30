@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { vvvExists, setSiteSkipProvisioning, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 export const enableCommand = new Command("enable")
   .description("Enable provisioning for a site")
@@ -9,16 +10,14 @@ export const enableCommand = new Command("enable")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     try {
       setSiteSkipProvisioning(vvvPath, name, false);
-      console.log(`Site '${name}' enabled.`);
-      console.log("Run 'vvvlocal up --provision' to provision the site.");
+      cli.success(`Site '${name}' enabled.`);
+      cli.info("Run 'vvvlocal up --provision' to provision the site.");
     } catch (error) {
-      console.error(`Error: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError((error as Error).message);
     }
   });

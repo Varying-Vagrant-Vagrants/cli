@@ -8,8 +8,8 @@ import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
 export const upCommand = new Command("up")
   .alias("start")
   .description("Start VVV and provision if needed")
-  .option("-p, --provision", "Force provisioning")
-  .option("--path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("--provision", "Force provisioning")
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .action(async (options) => {
     const vvvPath = options.path;
 

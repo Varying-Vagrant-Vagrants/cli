@@ -128,7 +128,7 @@ function getServiceName(service: string, vvvPath: string): string {
  * Uses 'sudo service' command for proper permissions in Docker containers.
  * Falls back to pgrep if service script doesn't detect running process.
  */
-function getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
+function _getServiceStatus(serviceName: string, vvvPath: string): { running: boolean; status: string } {
   const result = vagrantSshSync(`sudo service ${serviceName} status 2>&1`, vvvPath);
   // Filter out VVV banner lines
   const boxChars = /[┌┐└┘│─╔╗╚╝║═▀▄█▌▐░▒▓■□▪▫]/;

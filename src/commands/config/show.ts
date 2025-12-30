@@ -37,7 +37,7 @@ export const showCommand = new Command("show")
     // Pretty output with some structure
     try {
       const config = loadConfig(vvvPath);
-      const content = readFileSync(configPath, "utf-8");
+      // Note: content could be used for raw output mode in the future
 
       console.log("");
       cli.bold(`VVV Configuration (${configPath})`);

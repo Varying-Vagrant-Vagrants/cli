@@ -2,7 +2,7 @@ import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
-import { ensureVvvExists, ensureVvvRunning } from "../../utils/cli.js";
+import { ensureVvvExists, ensureVvvRunning, exitWithError } from "../../utils/cli.js";
 import { getUserDatabases } from "../../utils/vagrant.js";
 import { DatabaseList } from "../../components/DatabaseList.js";
 
@@ -21,13 +21,12 @@ export const listCommand = new Command("list")
       const databases = getUserDatabases(vvvPath);
 
       if (options.json) {
-        console.log(JSON.stringify(databases, null, 2));
+        console.log(JSON.stringify({ success: true, data: databases }, null, 2));
         return;
       }
 
       render(React.createElement(DatabaseList, { databases }));
     } catch (error) {
-      console.error(`Failed to list databases: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError(`Failed to list databases: ${(error as Error).message}`);
     }
   });

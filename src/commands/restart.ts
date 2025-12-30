@@ -6,7 +6,7 @@ import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
 export const restartCommand = new Command("restart")
   .alias("reload")
   .description("Restart VVV (halt then up)")
-  .option("--path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
+  .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .action(async (options) => {
     const vvvPath = options.path;
 

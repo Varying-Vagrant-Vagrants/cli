@@ -145,8 +145,9 @@ export function exitWithError(message: string, suggestion?: string | number, cod
 
   cli.error(message);
   if (suggestion) {
+    const c = getColors();
     console.log("");
-    console.log(`${colors.dim}Suggestion:${colors.reset} ${suggestion}`);
+    console.log(`${c.dim}Suggestion:${c.reset} ${suggestion}`);
   }
   process.exit(code);
 }

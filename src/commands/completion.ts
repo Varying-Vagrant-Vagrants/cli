@@ -32,7 +32,7 @@ const SERVICES = ["nginx", "php", "mysql", "mariadb", "memcached"];
 /**
  * Get site names from VVV config for completion.
  */
-function getSiteNames(vvvPath: string): string[] {
+function _getSiteNames(vvvPath: string): string[] {
   try {
     const configPath = join(vvvPath, "config", "config.yml");
     if (!existsSync(configPath)) {
@@ -334,7 +334,7 @@ export const completionCommand = new Command("completion")
   .description("Generate shell completion scripts")
   .argument("<shell>", "Shell type: bash, zsh, or fish")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
-  .action((shell, options) => {
+  .action((shell, _options) => {
     const shellLower = shell.toLowerCase();
 
     switch (shellLower) {

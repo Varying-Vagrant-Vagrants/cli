@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { vvvExists, disableExtension, DEFAULT_VVV_PATH } from "../../utils/config.js";
+import { exitWithError, cli } from "../../utils/cli.js";
 
 export const disableCommand = new Command("disable")
   .description("Disable an extension provisioner")
@@ -9,23 +10,23 @@ export const disableCommand = new Command("disable")
     const vvvPath = options.path;
 
     if (!vvvExists(vvvPath)) {
-      console.error(`VVV not found at ${vvvPath}`);
-      process.exit(1);
+      exitWithError(`VVV not found at ${vvvPath}`);
     }
 
     const parts = extProvisioner.split("/");
     if (parts.length !== 2) {
-      console.error("Invalid format. Use: extension/provisioner (e.g., core/phpmyadmin)");
-      process.exit(1);
+      exitWithError(
+        "Invalid format.",
+        "Use: extension/provisioner (e.g., core/phpmyadmin)"
+      );
     }
 
     const [extension, provisioner] = parts;
 
     try {
       disableExtension(vvvPath, extension, provisioner);
-      console.log(`Extension '${extension}/${provisioner}' disabled.`);
+      cli.success(`Extension '${extension}/${provisioner}' disabled.`);
     } catch (error) {
-      console.error(`Error: ${(error as Error).message}`);
-      process.exit(1);
+      exitWithError((error as Error).message);
     }
   });

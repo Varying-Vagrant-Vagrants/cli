@@ -21,6 +21,7 @@
     "lint:fix": "eslint src/ --fix",
     "typecheck": "tsc --noEmit",
     "check": "bun run typecheck && bun run lint",
+    "validate": "bun run typecheck && bun run lint && bun run test:unit",
     "test": "bun test",
     "test:unit": "bun test tests/utils tests/commands",
     "test:integration": "VVV_INTEGRATION_TEST=1 bun test tests/integration/integration.test.ts",
