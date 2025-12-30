@@ -35,37 +35,101 @@ export function verbose(message: string): void {
   }
 }
 
-// ANSI color codes
-const colors = {
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  reset: "\x1b[0m",
-};
+/**
+ * Check if colors should be used.
+ * Disabled when:
+ * - stdout is not a TTY (piped to another command)
+ * - NO_COLOR environment variable is set (standard convention)
+ * - CI environment variable is set (running in CI)
+ */
+export function shouldUseColors(): boolean {
+  if (process.env.NO_COLOR !== undefined) return false;
+  if (process.env.CI !== undefined) return false;
+  return process.stdout.isTTY === true;
+}
+
+// ANSI color codes (empty strings when colors disabled)
+function getColors() {
+  if (!shouldUseColors()) {
+    return {
+      red: "",
+      green: "",
+      yellow: "",
+      blue: "",
+      cyan: "",
+      bold: "",
+      dim: "",
+      reset: "",
+    };
+  }
+  return {
+    red: "\x1b[31m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    blue: "\x1b[34m",
+    cyan: "\x1b[36m",
+    bold: "\x1b[1m",
+    dim: "\x1b[2m",
+    reset: "\x1b[0m",
+  };
+}
 
 /**
  * Console output helpers with consistent colors.
+ * Colors are automatically disabled when output is piped.
  */
 export const cli = {
-  error: (msg: string) => console.error(`${colors.red}${msg}${colors.reset}`),
-  warning: (msg: string) => console.log(`${colors.yellow}${msg}${colors.reset}`),
-  success: (msg: string) => console.log(`${colors.green}${msg}${colors.reset}`),
-  info: (msg: string) => console.log(`${colors.cyan}${msg}${colors.reset}`),
-  bold: (msg: string) => console.log(`${colors.bold}${msg}${colors.reset}`),
-  dim: (msg: string) => console.log(`${colors.dim}${msg}${colors.reset}`),
+  error: (msg: string) => {
+    const c = getColors();
+    console.error(`${c.red}${msg}${c.reset}`);
+  },
+  warning: (msg: string) => {
+    const c = getColors();
+    console.log(`${c.yellow}${msg}${c.reset}`);
+  },
+  success: (msg: string) => {
+    const c = getColors();
+    console.log(`${c.green}${msg}${c.reset}`);
+  },
+  info: (msg: string) => {
+    const c = getColors();
+    console.log(`${c.cyan}${msg}${c.reset}`);
+  },
+  bold: (msg: string) => {
+    const c = getColors();
+    console.log(`${c.bold}${msg}${c.reset}`);
+  },
+  dim: (msg: string) => {
+    const c = getColors();
+    console.log(`${c.dim}${msg}${c.reset}`);
+  },
 
   // Inline formatting helpers (return strings, don't print)
   format: {
-    error: (msg: string) => `${colors.red}${msg}${colors.reset}`,
-    warning: (msg: string) => `${colors.yellow}${msg}${colors.reset}`,
-    success: (msg: string) => `${colors.green}${msg}${colors.reset}`,
-    info: (msg: string) => `${colors.cyan}${msg}${colors.reset}`,
-    bold: (msg: string) => `${colors.bold}${msg}${colors.reset}`,
-    dim: (msg: string) => `${colors.dim}${msg}${colors.reset}`,
+    error: (msg: string) => {
+      const c = getColors();
+      return `${c.red}${msg}${c.reset}`;
+    },
+    warning: (msg: string) => {
+      const c = getColors();
+      return `${c.yellow}${msg}${c.reset}`;
+    },
+    success: (msg: string) => {
+      const c = getColors();
+      return `${c.green}${msg}${c.reset}`;
+    },
+    info: (msg: string) => {
+      const c = getColors();
+      return `${c.cyan}${msg}${c.reset}`;
+    },
+    bold: (msg: string) => {
+      const c = getColors();
+      return `${c.bold}${msg}${c.reset}`;
+    },
+    dim: (msg: string) => {
+      const c = getColors();
+      return `${c.dim}${msg}${c.reset}`;
+    },
   },
 };
 
@@ -128,15 +192,28 @@ export function ensureVvvExists(vvvPath: string): void {
 }
 
 /**
- * Check if VVV is currently running.
+ * Possible VM states from vagrant status.
  */
-export function isVvvRunning(vvvPath: string): boolean {
+export type VmState = "running" | "poweroff" | "not_created" | "unknown";
+
+/**
+ * Get the current VM state.
+ */
+export function getVmState(vvvPath: string): VmState {
   const result = spawnSync("vagrant", ["status", "--machine-readable"], {
     cwd: vvvPath,
     encoding: "utf-8",
   });
 
-  return result.stdout?.includes(",state,running") ?? false;
+  const match = result.stdout?.match(/,state,(\w+)/);
+  return (match?.[1] as VmState) || "unknown";
+}
+
+/**
+ * Check if VVV is currently running.
+ */
+export function isVvvRunning(vvvPath: string): boolean {
+  return getVmState(vvvPath) === "running";
 }
 
 /**

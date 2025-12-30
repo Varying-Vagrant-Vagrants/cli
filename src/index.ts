@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
-import { setVerboseMode, cli } from "./utils/cli.js";
+import { upCommand, stopCommand, restartCommand, statusCommand, reprovisionCommand, sshCommand, destroyCommand, execCommand, infoCommand, siteCommand, extensionCommand, databaseCommand, phpCommand, configCommand, hostsCommand, logsCommand, openCommand, serviceCommand, snapshotCommand, sslCommand, wpCommand, xdebugCommand, installCommand, providersCommand, upgradeCommand, completionCommand, doctorCommand } from "./commands/index.js";
+import { setVerboseMode, cli, shouldUseColors } from "./utils/cli.js";
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
@@ -86,21 +86,31 @@ if (process.getuid && process.getuid() === 0) {
   process.exit(1);
 }
 
-// ANSI color codes
-const red = "\x1b[38;5;9m";
-const green = "\x1b[1;38;5;2m";
-const blue = "\x1b[38;5;4m";
-const cyan = "\x1b[36m";
-const yellow = "\x1b[33m";
-const reset = "\x1b[0m";
-const bold = "\x1b[1m";
-const dim = "\x1b[2m";
+// ANSI color codes (respects TTY detection)
+function getCliColors() {
+  if (!shouldUseColors()) {
+    return { red: "", green: "", blue: "", cyan: "", yellow: "", reset: "", bold: "", dim: "" };
+  }
+  return {
+    red: "\x1b[38;5;9m",
+    green: "\x1b[1;38;5;2m",
+    blue: "\x1b[38;5;4m",
+    cyan: "\x1b[36m",
+    yellow: "\x1b[33m",
+    reset: "\x1b[0m",
+    bold: "\x1b[1m",
+    dim: "\x1b[2m",
+  };
+}
 
-const logo = `
+function getLogo() {
+  const { red, green, blue, reset } = getCliColors();
+  return `
 ${red}__ ${green}__ ${blue}__ __
 ${red}\\ V${green}\\ V${blue}\\ V /${reset}  vvvlocal
 ${red} \\_/${green}\\_/${blue}\\_/${reset}   CLI for VVV
 `;
+}
 
 // Define command groups with their commands
 const commandGroups = [
@@ -126,11 +136,12 @@ const commandGroups = [
   },
   {
     name: "System",
-    commands: ["completion", "config", "doctor", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
+    commands: ["completion", "config", "doctor", "hosts", "info", "install", "logs", "providers", "service", "ssl", "upgrade"],
   },
 ];
 
 function formatGroupedHelp(program: Command): string {
+  const { bold, reset, cyan, yellow, dim } = getCliColors();
   const lines: string[] = [];
 
   lines.push(`${bold}Usage:${reset} ${program.name()} [options] [command]`);
@@ -211,7 +222,7 @@ program
   .description("CLI tool for VVV (Varying Vagrant Vagrants)")
   .version("0.1.0")
   .option("--verbose", "Show detailed output")
-  .addHelpText("beforeAll", logo)
+  .addHelpText("beforeAll", () => getLogo())
   .addHelpCommand(false) // Disable help subcommand
   .hook("preAction", (thisCommand) => {
     const opts = thisCommand.opts();
@@ -221,7 +232,7 @@ program
   })
   .action(() => {
     // When run without arguments, show custom help
-    console.log(logo);
+    console.log(getLogo());
     console.log(formatGroupedHelp(program));
     process.exit(0);
   });
@@ -238,6 +249,7 @@ program.addCommand(destroyCommand);
 program.addCommand(doctorCommand);
 program.addCommand(execCommand);
 program.addCommand(extensionCommand);
+program.addCommand(hostsCommand);
 program.addCommand(infoCommand);
 program.addCommand(installCommand);
 program.addCommand(logsCommand);
