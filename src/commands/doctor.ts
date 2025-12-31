@@ -518,7 +518,7 @@ async function checkNetwork(ctx: CheckContext): Promise<CheckResult[]> {
       } else if (daysRemaining < 7) {
         results.push(warn("SSL certificate", category, `SSL certificate expires in ${daysRemaining} days`));
       } else {
-        results.push(pass("SSL certificate", category, `Valid for ${daysRemaining} days`));
+        results.push(pass("SSL certificate", category, `SSL certificate valid for ${daysRemaining} days`));
       }
     }
   }
