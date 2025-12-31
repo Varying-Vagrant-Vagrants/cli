@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `sites` command alias for `site` command for convenience
+- `box` command (alias: `vm`) for Vagrant box management
+  - `box info` subcommand to display box version, guest OS info, and EOL warnings
+  - `box upgrade` subcommand for automated box migration with snapshot backup
+- Box information checks in `doctor` command showing box version and Ubuntu EOL status
+- `--folder` flag to `open` command to open sites in file manager (Finder/Explorer)
+- `--vscode` and `--code` flags to `open` command to open sites in VS Code
+- One-line installer scripts for easy installation
+  - `install.sh` for macOS and Linux
+  - `install.ps1` for Windows PowerShell
+- Quick Install section in README with one-line installation commands
+- Collapsible table of contents in README
+- Launcher utility for cross-platform browser, file manager, and editor support
+
+### Fixed
+- Unknown command error now shows "Unknown command" instead of confusing "too many arguments" message
+- macOS version detection now uses `sw_vers` for accurate version information
+  - Dynamically extracts marketing name from license file
+  - Properly displays version for all macOS releases including beta versions
+- Box upgrade command no longer destroys VM unnecessarily
+  - Now checks if box upgrade is available before proceeding
+  - Exits early with success message if box is already up-to-date
+  - Only asks for confirmation when upgrade is actually needed
+
+### Improved
+- Error handling for mistyped commands with helpful suggestions
+- macOS version detection removed hardcoded version mappings
+- Box upgrade workflow provides clear feedback about update status
+- Open command eliminates code duplication with unified launcher utility
+
 ## [1.0.0] - 2025-12-30
 
 ### Initial Release
