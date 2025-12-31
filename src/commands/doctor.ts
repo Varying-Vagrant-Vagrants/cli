@@ -667,6 +667,24 @@ function checkLogFiles(ctx: CheckContext): CheckResult[] {
 // MAIN DOCTOR COMMAND
 // =============================================================================
 
+/**
+ * Show progress for a completed phase
+ */
+function showPhaseProgress(phaseName: string, phaseResults: CheckResult[]): void {
+  const passed = phaseResults.filter(r => r.status === "pass").length;
+  const failed = phaseResults.filter(r => r.status === "fail").length;
+  const warnings = phaseResults.filter(r => r.status === "warn").length;
+  const total = phaseResults.length;
+
+  if (failed > 0) {
+    cli.error(`✗ ${phaseName}: ${passed}/${total} passed, ${failed} failed${warnings > 0 ? `, ${warnings} warnings` : ""}`);
+  } else if (warnings > 0) {
+    cli.warning(`⚠ ${phaseName}: ${passed}/${total} passed, ${warnings} warnings`);
+  } else {
+    cli.success(`✓ ${phaseName}: All ${total} checks passed`);
+  }
+}
+
 async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   const ctx: CheckContext = {
     vvvPath,
@@ -678,20 +696,32 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
 
   // Phase 1: Prerequisites (can run without VM)
+  cli.info("Checking prerequisites...");
   verbose("Checking prerequisites...");
-  results.push(...await checkPrerequisites(ctx));
+  const prereqResults = await checkPrerequisites(ctx);
+  results.push(...prereqResults);
+  showPhaseProgress("Prerequisites", prereqResults);
 
   // Phase 2: VVV Installation (can run without VM)
+  cli.info("Checking VVV installation...");
   verbose("Checking VVV installation...");
-  results.push(...await checkVvvInstallation(ctx));
+  const vvvResults = await checkVvvInstallation(ctx);
+  results.push(...vvvResults);
+  showPhaseProgress("VVV Installation", vvvResults);
 
   // Phase 3: VM State (determines if we can continue)
+  cli.info("Checking VM state...");
   verbose("Checking VM state...");
-  results.push(...checkVmState(ctx));
+  const vmResults = checkVmState(ctx);
+  results.push(...vmResults);
+  showPhaseProgress("VM State", vmResults);
 
   // Phase 4: Box Information
+  cli.info("Checking box information...");
   verbose("Checking box information...");
-  results.push(...checkBoxInfo(ctx));
+  const boxResults = checkBoxInfo(ctx);
+  results.push(...boxResults);
+  showPhaseProgress("Box Information", boxResults);
 
   // Check for port conflicts when using Docker and VM is NOT running
   // (if VM is running, it's using those ports legitimately)
@@ -719,28 +749,44 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
 
   // Fail fast if VM not running
   if (!ctx.vmRunning) {
+    cli.warning("VM is not running - skipping VM-dependent checks");
     return results;
   }
 
   // Phase 5: Services (requires VM)
+  cli.info("Checking services...");
   verbose("Checking services...");
-  results.push(...checkServices(ctx));
+  const serviceResults = checkServices(ctx);
+  results.push(...serviceResults);
+  showPhaseProgress("Services", serviceResults);
 
   // Phase 6: Network (requires VM)
+  cli.info("Checking network...");
   verbose("Checking network...");
-  results.push(...await checkNetwork(ctx));
+  const networkResults = await checkNetwork(ctx);
+  results.push(...networkResults);
+  showPhaseProgress("Network", networkResults);
 
   // Phase 7: Database (requires VM)
+  cli.info("Checking database...");
   verbose("Checking database...");
-  results.push(...checkDatabase(ctx));
+  const dbResults = checkDatabase(ctx);
+  results.push(...dbResults);
+  showPhaseProgress("Database", dbResults);
 
   // Phase 8: Configuration (can run without VM but more useful with)
+  cli.info("Checking configuration...");
   verbose("Checking configuration...");
-  results.push(...checkConfiguration(ctx));
+  const configResults = checkConfiguration(ctx);
+  results.push(...configResults);
+  showPhaseProgress("Configuration", configResults);
 
   // Phase 9: Log files (requires VM)
+  cli.info("Checking log files...");
   verbose("Checking log files...");
-  results.push(...checkLogFiles(ctx));
+  const logResults = checkLogFiles(ctx);
+  results.push(...logResults);
+  showPhaseProgress("Log Files", logResults);
 
   return results;
 }
