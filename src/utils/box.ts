@@ -90,3 +90,21 @@ export function isUbuntuEol(version: string): boolean {
 
   return new Date(eolDate) < new Date();
 }
+
+/**
+ * Check if box upgrade is available using Vagrant's built-in check
+ * Returns true if a newer box version is available
+ */
+export function isBoxOutdated(vvvPath: string): boolean {
+  const result = vagrantRunSync(["box", "outdated"], vvvPath);
+
+  // Exit code 0 = box is outdated (upgrade available)
+  // Exit code 1 = box is up-to-date (no upgrade needed)
+  // Any other exit code = treat as error, proceed with upgrade (safe default)
+
+  if (result.status === 1) {
+    return false; // Box is current, no upgrade needed
+  }
+
+  return true; // Box is outdated or error - proceed with upgrade
+}

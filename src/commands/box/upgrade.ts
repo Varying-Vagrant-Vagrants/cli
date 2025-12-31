@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../../utils/config.js";
 import { ensureVvvExists, cli, exitWithError, confirm } from "../../utils/cli.js";
-import { getBoxInfo } from "../../utils/box.js";
+import { getBoxInfo, isBoxOutdated } from "../../utils/box.js";
 import { vagrantRunSync } from "../../utils/vagrant.js";
 
 export const upgradeCommand = new Command("upgrade")
@@ -22,6 +22,28 @@ export const upgradeCommand = new Command("upgrade")
 
     cli.info(`Current box: ${boxInfo.name} ${boxInfo.version}`);
 
+    // Check if upgrade is available
+    cli.info("Checking for box updates...");
+    const isOutdated = isBoxOutdated(vvvPath);
+
+    if (!isOutdated) {
+      if (options.json) {
+        console.log(JSON.stringify({
+          success: true,
+          upgradeNeeded: false,
+          currentBox: boxInfo,
+          message: "Box is already up-to-date. No upgrade needed."
+        }, null, 2));
+      } else {
+        cli.success("✓ Box is already up-to-date.");
+        cli.info("No upgrade needed - you're using the latest version.");
+      }
+      return;
+    }
+
+    // Box upgrade is available
+    cli.warning("⚠️  A newer box version is available.");
+
     if (options.dryRun) {
       cli.info("Dry run - no changes will be made:");
       console.log("  1. Create VM snapshot");
@@ -33,9 +55,9 @@ export const upgradeCommand = new Command("upgrade")
       return;
     }
 
-    // Confirm destructive action
+    // Confirm destructive action (moved after upgrade check)
     if (!options.yes) {
-      cli.warning("⚠️  This will destroy your VM and recreate it.");
+      cli.warning("This will destroy your VM and recreate it with the updated box.");
       cli.info("Your sites and databases will be backed up and restored.");
 
       const confirmed = await confirm("Continue with box upgrade?");
