@@ -198,6 +198,14 @@ export function vagrantRunAsync(
     let stdout = "";
     let stderr = "";
     let resolved = false;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
 
     vagrant.stdout.on("data", (data: Buffer) => {
       stdout += data.toString("utf-8");
@@ -210,6 +218,7 @@ export function vagrantRunAsync(
     vagrant.on("error", (error: Error) => {
       if (resolved) return;
       resolved = true;
+      cleanup();
       verbose(`Process error: ${error.message}`);
       resolve({
         status: 1,
@@ -225,6 +234,7 @@ export function vagrantRunAsync(
     vagrant.on("close", (code: number | null) => {
       if (resolved) return;
       resolved = true;
+      cleanup();
       verbose(`Exit code: ${code}`);
       resolve({
         status: code ?? 1,
@@ -238,9 +248,10 @@ export function vagrantRunAsync(
 
     // Handle timeout
     if (timeout > 0) {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         if (resolved) return;
         resolved = true;
+        cleanup();
         vagrant.kill();
         verbose("Process timeout");
         resolve({
