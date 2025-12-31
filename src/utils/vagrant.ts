@@ -178,6 +178,98 @@ export function vagrantSshSync(
 }
 
 /**
+ * Run a vagrant command asynchronously and capture stdout/stderr.
+ * Returns a promise with the same structure as SpawnSyncReturns.
+ */
+export function vagrantRunAsync(
+  args: string[],
+  vvvPath: string,
+  timeout: number = 30000
+): Promise<SpawnSyncReturns<string>> {
+  verbose(`Running async: vagrant ${args.join(" ")}`);
+  verbose(`Working directory: ${vvvPath}`);
+
+  return new Promise((resolve) => {
+    const vagrant = spawn("vagrant", args, {
+      cwd: vvvPath,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let resolved = false;
+
+    vagrant.stdout.on("data", (data: Buffer) => {
+      stdout += data.toString("utf-8");
+    });
+
+    vagrant.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString("utf-8");
+    });
+
+    vagrant.on("error", (error: Error) => {
+      if (resolved) return;
+      resolved = true;
+      verbose(`Process error: ${error.message}`);
+      resolve({
+        status: 1,
+        stdout,
+        stderr: stderr + error.message,
+        pid: vagrant.pid ?? 0,
+        output: [null, stdout, stderr],
+        signal: null,
+        error: error,
+      });
+    });
+
+    vagrant.on("close", (code: number | null) => {
+      if (resolved) return;
+      resolved = true;
+      verbose(`Exit code: ${code}`);
+      resolve({
+        status: code ?? 1,
+        stdout,
+        stderr,
+        pid: vagrant.pid ?? 0,
+        output: [null, stdout, stderr],
+        signal: null,
+      });
+    });
+
+    // Handle timeout
+    if (timeout > 0) {
+      setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        vagrant.kill();
+        verbose("Process timeout");
+        resolve({
+          status: 1,
+          stdout,
+          stderr: stderr + "Process timeout",
+          pid: vagrant.pid ?? 0,
+          output: [null, stdout, stderr],
+          signal: "SIGTERM",
+        });
+      }, timeout);
+    }
+  });
+}
+
+/**
+ * Run a command inside VVV via vagrant ssh asynchronously and capture stdout/stderr.
+ * Returns a promise with the same structure as SpawnSyncReturns.
+ */
+export function vagrantSshAsync(
+  command: string,
+  vvvPath: string,
+  timeout: number = 30000
+): Promise<SpawnSyncReturns<string>> {
+  verbose(`SSH command (async): ${command}`);
+  return vagrantRunAsync(["ssh", "-c", command, "--", "-T"], vvvPath, timeout);
+}
+
+/**
  * Run a MySQL command inside VVV and return the output.
  * Filters out system output and validates results.
  * Note: query is properly escaped for shell single quotes.
