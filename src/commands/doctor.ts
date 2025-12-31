@@ -720,18 +720,22 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   let phaseStart: number;
 
-  // Phase 1: Run independent checks in parallel
+  // Phase 1: Prerequisites first (needed to populate ctx.availableProviders)
   phaseStart = Date.now();
   cli.info("Running initial checks...");
-  verbose("Running prerequisite, installation, and configuration checks in parallel...");
+  verbose("Checking prerequisites...");
 
-  const [prereqResults, vvvResults, configResults] = await Promise.all([
-    checkPrerequisites(ctx),
+  const prereqResults = await checkPrerequisites(ctx);
+  results.push(...prereqResults);
+
+  // Now run VVV installation and configuration checks in parallel (they can use ctx.availableProviders)
+  verbose("Checking VVV installation and configuration in parallel...");
+  const [vvvResults, configResults] = await Promise.all([
     checkVvvInstallation(ctx),
     checkConfiguration(ctx),
   ]);
 
-  results.push(...prereqResults, ...vvvResults, ...configResults);
+  results.push(...vvvResults, ...configResults);
   showPhaseProgress("Initial Checks", [...prereqResults, ...vvvResults, ...configResults], phaseStart);
 
   // Phase 2: VM State (determines if we can continue with VM-dependent checks)
