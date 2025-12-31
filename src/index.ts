@@ -316,12 +316,12 @@ program.addCommand(xdebugCommand);
 // Better error handling for unknown commands
 // Check if the first argument is an unknown command before parsing
 const args = process.argv.slice(2);
-if (args.length > 0 && !args[0].startsWith('-')) {
-  const potentialCommand = args[0];
+const firstArg = args[0];
+if (firstArg && !firstArg.startsWith('-')) {
   const knownCommands = program.commands.map(cmd => [cmd.name(), ...(cmd.aliases() || [])]).flat();
 
-  if (!knownCommands.includes(potentialCommand)) {
-    console.error(`Unknown command: ${potentialCommand}`);
+  if (!knownCommands.includes(firstArg)) {
+    console.error(`Unknown command: ${firstArg}`);
     console.error(`\nRun 'vvvlocal --help' to see available commands.`);
     process.exit(1);
   }
