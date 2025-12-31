@@ -399,45 +399,49 @@ function checkServices(ctx: CheckContext): CheckResult[] {
     return results;
   }
 
-  // Check Nginx
-  const nginxResult = vagrantSshSync("sudo service nginx status 2>&1", ctx.vvvPath);
-  if (nginxResult.stdout?.includes("is running")) {
+  // Batch all service checks into a single SSH call
+  const batchCommand = `
+    echo "===NGINX_START===" && sudo service nginx status 2>&1 && echo "===NGINX_OK===" || echo "===NGINX_FAIL==="
+    echo "===MYSQL_START===" && mysqladmin ping 2>&1 && echo "===MYSQL_OK===" || echo "===MYSQL_FAIL==="
+    echo "===PHP_START===" && (sudo service php8.2-fpm status 2>&1 || sudo service php8.1-fpm status 2>&1 || sudo service php8.0-fpm status 2>&1) && echo "===PHP_OK===" || echo "===PHP_FAIL==="
+    echo "===MEMCACHED_START===" && sudo service memcached status 2>&1 && echo "===MEMCACHED_OK===" || echo "===MEMCACHED_FAIL==="
+    echo "===MEMCACHED_PGREP===" && (pgrep -x memcached >/dev/null && echo running || echo stopped)
+  `;
+
+  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const output = result.stdout || "";
+
+  // Parse Nginx
+  if (output.includes("===NGINX_OK===")) {
     results.push(pass("Nginx", category, "Nginx is running"));
   } else {
     results.push(fail("Nginx", category, "Nginx is not running", "Run: vvvlocal service start nginx"));
   }
 
-  // Check MariaDB
-  const mariaResult = vagrantSshSync("mysqladmin ping 2>&1", ctx.vvvPath);
-  if (mariaResult.stdout?.includes("alive")) {
+  // Parse MariaDB
+  if (output.includes("===MYSQL_OK===")) {
     results.push(pass("MariaDB", category, "MariaDB is running"));
   } else {
     results.push(fail("MariaDB", category, "MariaDB is not running", "Run: vvvlocal service start mariadb"));
   }
 
-  // Check PHP-FPM (at least one version)
-  const phpResult = vagrantSshSync("sudo service php8.2-fpm status 2>&1 || sudo service php8.1-fpm status 2>&1 || sudo service php8.0-fpm status 2>&1", ctx.vvvPath);
-  if (phpResult.stdout?.includes("is running")) {
+  // Parse PHP-FPM
+  if (output.includes("===PHP_OK===")) {
     results.push(pass("PHP-FPM", category, "PHP-FPM is running"));
   } else {
     results.push(fail("PHP-FPM", category, "No PHP-FPM service running", "Run: vvvlocal service start php"));
   }
 
-  // Check Memcached (warn only)
-  // Uses pgrep fallback since service script may not detect manually started processes
-  const memcachedResult = vagrantSshSync("sudo service memcached status 2>&1", ctx.vvvPath);
-  if (memcachedResult.stdout?.includes("is running")) {
+  // Parse Memcached
+  const memcachedSection = output.substring(output.indexOf("===MEMCACHED_START==="));
+  if (output.includes("===MEMCACHED_OK===")) {
     results.push(pass("Memcached", category, "Memcached is running"));
-  } else if (memcachedResult.stdout?.includes("unrecognized service")) {
+  } else if (memcachedSection.includes("unrecognized service")) {
     results.push(skip("Memcached", category, "Memcached not installed"));
+  } else if (memcachedSection.includes("===MEMCACHED_PGREP===") && memcachedSection.includes("running")) {
+    results.push(pass("Memcached", category, "Memcached is running"));
   } else {
-    // Fallback: check if process is actually running
-    const pgrepResult = vagrantSshSync("pgrep -x memcached >/dev/null && echo running || echo stopped", ctx.vvvPath);
-    if (pgrepResult.stdout?.includes("running")) {
-      results.push(pass("Memcached", category, "Memcached is running"));
-    } else {
-      results.push(warn("Memcached", category, "Memcached is not running (optional)", "Run: vvvlocal service start memcached"));
-    }
+    results.push(warn("Memcached", category, "Memcached is not running (optional)", "Run: vvvlocal service start memcached"));
   }
 
   return results;
@@ -535,19 +539,25 @@ function checkDatabase(ctx: CheckContext): CheckResult[] {
     return results;
   }
 
-  // Check MySQL connection
-  const connResult = vagrantSshSync("mysql -e 'SELECT 1' 2>&1", ctx.vvvPath);
-  if (connResult.status === 0) {
+  // Batch both database checks into a single SSH call
+  const batchCommand = `
+    echo "===MYSQL_CONN_START===" && mysql -e 'SELECT 1' 2>&1 && echo "===MYSQL_CONN_OK===" || echo "===MYSQL_CONN_FAIL==="
+    echo "===MYSQL_DBS_START===" && mysql -e 'SHOW DATABASES' 2>&1
+  `;
+
+  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const output = result.stdout || "";
+
+  // Parse MySQL connection
+  if (output.includes("===MYSQL_CONN_OK===")) {
     results.push(pass("MySQL connection", category, "Can connect to MySQL"));
   } else {
     results.push(fail("MySQL connection", category, "Cannot connect to MySQL", "Check MariaDB service"));
     return results;
   }
 
-  // Check system databases exist
-  const dbResult = vagrantSshSync("mysql -e 'SHOW DATABASES' 2>&1", ctx.vvvPath);
-  const dbs = dbResult.stdout || "";
-  if (dbs.includes("mysql") && dbs.includes("information_schema")) {
+  // Parse system databases
+  if (output.includes("mysql") && output.includes("information_schema")) {
     results.push(pass("System databases", category, "System databases present"));
   } else {
     results.push(fail("System databases", category, "System databases missing", "MySQL installation may be corrupted"));
@@ -626,38 +636,51 @@ function checkLogFiles(ctx: CheckContext): CheckResult[] {
     return results;
   }
 
-  // Check log sizes
-  const checkLog = (name: string, path: string, maxMB: number) => {
-    const result = vagrantSshSync(`du -k ${path} 2>/dev/null | cut -f1`, ctx.vvvPath);
-    const sizeKB = parseInt(result.stdout?.trim() || "0", 10);
+  // Batch all log and disk checks into a single SSH call
+  const batchCommand = `
+    echo "===NGINX_LOG===" && du -k /var/log/nginx/error.log 2>/dev/null | cut -f1 || echo "0"
+    echo "===MYSQL_LOG===" && du -k /var/log/mysql/error.log 2>/dev/null | cut -f1 || echo "0"
+    echo "===DISK_USAGE===" && df -h / | tail -1 | awk '{print $5}'
+  `;
+
+  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const output = result.stdout || "";
+
+  // Parse Nginx log size
+  const nginxMatch = output.match(/===NGINX_LOG===\s*(\d+)/);
+  if (nginxMatch && nginxMatch[1]) {
+    const sizeKB = parseInt(nginxMatch[1], 10);
     const sizeMB = sizeKB / 1024;
-
-    if (sizeKB === 0) {
-      // File doesn't exist or is empty - that's fine
-      return;
+    if (sizeKB > 0 && sizeMB > 100) {
+      results.push(warn("Nginx error log", category, `Nginx error log is ${sizeMB.toFixed(0)}MB`, "Consider rotating logs in /var/log/nginx/error.log"));
+    } else if (sizeKB > 0) {
+      verbose(`Nginx error log: ${sizeMB.toFixed(1)}MB`);
     }
+  }
 
-    if (sizeMB > maxMB) {
-      results.push(warn(`${name} log`, category, `${name} log is ${sizeMB.toFixed(0)}MB`, `Consider rotating logs in ${path}`));
+  // Parse MySQL log size
+  const mysqlMatch = output.match(/===MYSQL_LOG===\s*(\d+)/);
+  if (mysqlMatch && mysqlMatch[1]) {
+    const sizeKB = parseInt(mysqlMatch[1], 10);
+    const sizeMB = sizeKB / 1024;
+    if (sizeKB > 0 && sizeMB > 100) {
+      results.push(warn("MySQL error log", category, `MySQL error log is ${sizeMB.toFixed(0)}MB`, "Consider rotating logs in /var/log/mysql/error.log"));
+    } else if (sizeKB > 0) {
+      verbose(`MySQL error log: ${sizeMB.toFixed(1)}MB`);
+    }
+  }
+
+  // Parse disk usage
+  const diskMatch = output.match(/===DISK_USAGE===\s*(\d+)%/);
+  if (diskMatch && diskMatch[1]) {
+    const usage = parseInt(diskMatch[1], 10);
+    if (usage >= 90) {
+      results.push(warn("VM disk usage", category, `VM disk is ${usage}% full`, "Free up space in the VM"));
+    } else if (usage >= 80) {
+      results.push(warn("VM disk usage", category, `VM disk is ${usage}% full`));
     } else {
-      verbose(`${name} log: ${sizeMB.toFixed(1)}MB`);
+      results.push(pass("VM disk usage", category, `VM disk is ${usage}% used`));
     }
-  };
-
-  checkLog("Nginx error", "/var/log/nginx/error.log", 100);
-  checkLog("MySQL error", "/var/log/mysql/error.log", 100);
-
-  // Check VM disk usage
-  const dfResult = vagrantSshSync("df -h / | tail -1 | awk '{print $5}'", ctx.vvvPath);
-  const usageStr = dfResult.stdout?.trim().replace("%", "") || "0";
-  const usage = parseInt(usageStr, 10);
-
-  if (usage >= 90) {
-    results.push(warn("VM disk usage", category, `VM disk is ${usage}% full`, "Free up space in the VM"));
-  } else if (usage >= 80) {
-    results.push(warn("VM disk usage", category, `VM disk is ${usage}% full`));
-  } else {
-    results.push(pass("VM disk usage", category, `VM disk is ${usage}% used`));
   }
 
   return results;
@@ -670,18 +693,19 @@ function checkLogFiles(ctx: CheckContext): CheckResult[] {
 /**
  * Show progress for a completed phase
  */
-function showPhaseProgress(phaseName: string, phaseResults: CheckResult[]): void {
+function showPhaseProgress(phaseName: string, phaseResults: CheckResult[], startTime: number): void {
   const passed = phaseResults.filter(r => r.status === "pass").length;
   const failed = phaseResults.filter(r => r.status === "fail").length;
   const warnings = phaseResults.filter(r => r.status === "warn").length;
   const total = phaseResults.length;
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
   if (failed > 0) {
-    cli.error(`✗ ${phaseName}: ${passed}/${total} passed, ${failed} failed${warnings > 0 ? `, ${warnings} warnings` : ""}`);
+    cli.error(`✗ ${phaseName}: ${passed}/${total} passed, ${failed} failed${warnings > 0 ? `, ${warnings} warnings` : ""} (${duration}s)`);
   } else if (warnings > 0) {
-    cli.warning(`⚠ ${phaseName}: ${passed}/${total} passed, ${warnings} warnings`);
+    cli.warning(`⚠ ${phaseName}: ${passed}/${total} passed, ${warnings} warnings (${duration}s)`);
   } else {
-    cli.success(`✓ ${phaseName}: All ${total} checks passed`);
+    cli.success(`✓ ${phaseName}: All ${total} checks passed (${duration}s)`);
   }
 }
 
@@ -694,34 +718,39 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   };
 
   const results: CheckResult[] = [];
+  let phaseStart: number;
 
   // Phase 1: Prerequisites (can run without VM)
+  phaseStart = Date.now();
   cli.info("Checking prerequisites...");
   verbose("Checking prerequisites...");
   const prereqResults = await checkPrerequisites(ctx);
   results.push(...prereqResults);
-  showPhaseProgress("Prerequisites", prereqResults);
+  showPhaseProgress("Prerequisites", prereqResults, phaseStart);
 
   // Phase 2: VVV Installation (can run without VM)
+  phaseStart = Date.now();
   cli.info("Checking VVV installation...");
   verbose("Checking VVV installation...");
   const vvvResults = await checkVvvInstallation(ctx);
   results.push(...vvvResults);
-  showPhaseProgress("VVV Installation", vvvResults);
+  showPhaseProgress("VVV Installation", vvvResults, phaseStart);
 
   // Phase 3: VM State (determines if we can continue)
+  phaseStart = Date.now();
   cli.info("Checking VM state...");
   verbose("Checking VM state...");
   const vmResults = checkVmState(ctx);
   results.push(...vmResults);
-  showPhaseProgress("VM State", vmResults);
+  showPhaseProgress("VM State", vmResults, phaseStart);
 
   // Phase 4: Box Information
+  phaseStart = Date.now();
   cli.info("Checking box information...");
   verbose("Checking box information...");
   const boxResults = checkBoxInfo(ctx);
   results.push(...boxResults);
-  showPhaseProgress("Box Information", boxResults);
+  showPhaseProgress("Box Information", boxResults, phaseStart);
 
   // Check for port conflicts when using Docker and VM is NOT running
   // (if VM is running, it's using those ports legitimately)
@@ -754,39 +783,44 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   }
 
   // Phase 5: Services (requires VM)
+  phaseStart = Date.now();
   cli.info("Checking services...");
   verbose("Checking services...");
   const serviceResults = checkServices(ctx);
   results.push(...serviceResults);
-  showPhaseProgress("Services", serviceResults);
+  showPhaseProgress("Services", serviceResults, phaseStart);
 
   // Phase 6: Network (requires VM)
+  phaseStart = Date.now();
   cli.info("Checking network...");
   verbose("Checking network...");
   const networkResults = await checkNetwork(ctx);
   results.push(...networkResults);
-  showPhaseProgress("Network", networkResults);
+  showPhaseProgress("Network", networkResults, phaseStart);
 
   // Phase 7: Database (requires VM)
+  phaseStart = Date.now();
   cli.info("Checking database...");
   verbose("Checking database...");
   const dbResults = checkDatabase(ctx);
   results.push(...dbResults);
-  showPhaseProgress("Database", dbResults);
+  showPhaseProgress("Database", dbResults, phaseStart);
 
   // Phase 8: Configuration (can run without VM but more useful with)
+  phaseStart = Date.now();
   cli.info("Checking configuration...");
   verbose("Checking configuration...");
   const configResults = checkConfiguration(ctx);
   results.push(...configResults);
-  showPhaseProgress("Configuration", configResults);
+  showPhaseProgress("Configuration", configResults, phaseStart);
 
   // Phase 9: Log files (requires VM)
+  phaseStart = Date.now();
   cli.info("Checking log files...");
   verbose("Checking log files...");
   const logResults = checkLogFiles(ctx);
   results.push(...logResults);
-  showPhaseProgress("Log Files", logResults);
+  showPhaseProgress("Log Files", logResults, phaseStart);
 
   return results;
 }
