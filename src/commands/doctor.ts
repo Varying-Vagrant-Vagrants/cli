@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "fs";
 import { resolve, join } from "path";
 import { DEFAULT_VVV_PATH, loadConfig, getConfigPath, vvvExists } from "../utils/config.js";
 import { cli, isVerbose, verbose } from "../utils/cli.js";
-import { isVagrantInstalled, vagrantSshSync, vagrantRunSync } from "../utils/vagrant.js";
+import { isVagrantInstalled, vagrantSshSync, vagrantSshAsync, vagrantRunAsync } from "../utils/vagrant.js";
 import { detectAvailableProvidersAsync, getCurrentProvider } from "../utils/providers.js";
 import { checkPortConflicts, VVV_PORTS } from "../utils/ports.js";
 import { getBoxInfo, getGuestOsInfo, isUbuntuEol } from "../utils/box.js";
@@ -302,12 +302,12 @@ async function checkVvvInstallation(ctx: CheckContext): Promise<CheckResult[]> {
 // VM STATE CHECKS
 // =============================================================================
 
-function checkVmState(ctx: CheckContext): CheckResult[] {
+async function checkVmState(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "VM State";
 
   // Check VM status
-  const statusResult = vagrantRunSync(["status", "--machine-readable"], ctx.vvvPath);
+  const statusResult = await vagrantRunAsync(["status", "--machine-readable"], ctx.vvvPath);
   const statusOutput = statusResult.stdout || "";
 
   if (statusOutput.includes(",state,running")) {
@@ -326,7 +326,7 @@ function checkVmState(ctx: CheckContext): CheckResult[] {
   }
 
   // Check SSH accessible
-  const sshResult = vagrantSshSync("echo vvv-doctor-ok", ctx.vvvPath);
+  const sshResult = await vagrantSshAsync("echo vvv-doctor-ok", ctx.vvvPath);
   if (sshResult.stdout?.includes("vvv-doctor-ok")) {
     results.push(pass("SSH accessible", category, "Can SSH into VM"));
   } else {
@@ -335,7 +335,7 @@ function checkVmState(ctx: CheckContext): CheckResult[] {
   }
 
   // Check time sync (warn if off by more than 5 minutes)
-  const timeResult = vagrantSshSync("date +%s", ctx.vvvPath);
+  const timeResult = await vagrantSshAsync("date +%s", ctx.vvvPath);
   const vmTime = parseInt(timeResult.stdout?.trim() || "0", 10);
   const hostTime = Math.floor(Date.now() / 1000);
   const timeDiff = Math.abs(vmTime - hostTime);
@@ -354,7 +354,7 @@ function checkVmState(ctx: CheckContext): CheckResult[] {
 // BOX INFORMATION CHECKS
 // =============================================================================
 
-function checkBoxInfo(ctx: CheckContext): CheckResult[] {
+async function checkBoxInfo(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "Box Information";
 
@@ -390,7 +390,7 @@ function checkBoxInfo(ctx: CheckContext): CheckResult[] {
 // SERVICES CHECKS
 // =============================================================================
 
-function checkServices(ctx: CheckContext): CheckResult[] {
+async function checkServices(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "Services";
 
@@ -408,7 +408,7 @@ function checkServices(ctx: CheckContext): CheckResult[] {
     echo "===MEMCACHED_PGREP===" && (pgrep -x memcached >/dev/null && echo running || echo stopped)
   `;
 
-  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const result = await vagrantSshAsync(batchCommand, ctx.vvvPath);
   const output = result.stdout || "";
 
   // Parse Nginx
@@ -530,7 +530,7 @@ async function checkNetwork(ctx: CheckContext): Promise<CheckResult[]> {
 // DATABASE CHECKS
 // =============================================================================
 
-function checkDatabase(ctx: CheckContext): CheckResult[] {
+async function checkDatabase(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "Database";
 
@@ -545,7 +545,7 @@ function checkDatabase(ctx: CheckContext): CheckResult[] {
     echo "===MYSQL_DBS_START===" && mysql -e 'SHOW DATABASES' 2>&1
   `;
 
-  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const result = await vagrantSshAsync(batchCommand, ctx.vvvPath);
   const output = result.stdout || "";
 
   // Parse MySQL connection
@@ -570,7 +570,7 @@ function checkDatabase(ctx: CheckContext): CheckResult[] {
 // CONFIGURATION CHECKS
 // =============================================================================
 
-function checkConfiguration(ctx: CheckContext): CheckResult[] {
+async function checkConfiguration(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "Configuration";
 
@@ -627,7 +627,7 @@ function checkConfiguration(ctx: CheckContext): CheckResult[] {
 // LOG FILES CHECKS
 // =============================================================================
 
-function checkLogFiles(ctx: CheckContext): CheckResult[] {
+async function checkLogFiles(ctx: CheckContext): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const category = "Log Files";
 
@@ -643,7 +643,7 @@ function checkLogFiles(ctx: CheckContext): CheckResult[] {
     echo "===DISK_USAGE===" && df -h / | tail -1 | awk '{print $5}'
   `;
 
-  const result = vagrantSshSync(batchCommand, ctx.vvvPath);
+  const result = await vagrantSshAsync(batchCommand, ctx.vvvPath);
   const output = result.stdout || "";
 
   // Parse Nginx log size
@@ -720,35 +720,33 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   let phaseStart: number;
 
-  // Phase 1: Prerequisites (can run without VM)
+  // Phase 1: Run independent checks in parallel
   phaseStart = Date.now();
-  cli.info("Checking prerequisites...");
-  verbose("Checking prerequisites...");
-  const prereqResults = await checkPrerequisites(ctx);
-  results.push(...prereqResults);
-  showPhaseProgress("Prerequisites", prereqResults, phaseStart);
+  cli.info("Running initial checks...");
+  verbose("Running prerequisite, installation, and configuration checks in parallel...");
 
-  // Phase 2: VVV Installation (can run without VM)
-  phaseStart = Date.now();
-  cli.info("Checking VVV installation...");
-  verbose("Checking VVV installation...");
-  const vvvResults = await checkVvvInstallation(ctx);
-  results.push(...vvvResults);
-  showPhaseProgress("VVV Installation", vvvResults, phaseStart);
+  const [prereqResults, vvvResults, configResults] = await Promise.all([
+    checkPrerequisites(ctx),
+    checkVvvInstallation(ctx),
+    checkConfiguration(ctx),
+  ]);
 
-  // Phase 3: VM State (determines if we can continue)
+  results.push(...prereqResults, ...vvvResults, ...configResults);
+  showPhaseProgress("Initial Checks", [...prereqResults, ...vvvResults, ...configResults], phaseStart);
+
+  // Phase 2: VM State (determines if we can continue with VM-dependent checks)
   phaseStart = Date.now();
   cli.info("Checking VM state...");
   verbose("Checking VM state...");
-  const vmResults = checkVmState(ctx);
+  const vmResults = await checkVmState(ctx);
   results.push(...vmResults);
   showPhaseProgress("VM State", vmResults, phaseStart);
 
-  // Phase 4: Box Information
+  // Phase 3: Box Information
   phaseStart = Date.now();
   cli.info("Checking box information...");
   verbose("Checking box information...");
-  const boxResults = checkBoxInfo(ctx);
+  const boxResults = await checkBoxInfo(ctx);
   results.push(...boxResults);
   showPhaseProgress("Box Information", boxResults, phaseStart);
 
@@ -782,15 +780,15 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
     return results;
   }
 
-  // Phase 5: Services (requires VM)
+  // Phase 4: Services (requires VM)
   phaseStart = Date.now();
   cli.info("Checking services...");
   verbose("Checking services...");
-  const serviceResults = checkServices(ctx);
+  const serviceResults = await checkServices(ctx);
   results.push(...serviceResults);
   showPhaseProgress("Services", serviceResults, phaseStart);
 
-  // Phase 6: Network (requires VM)
+  // Phase 5: Network (requires VM)
   phaseStart = Date.now();
   cli.info("Checking network...");
   verbose("Checking network...");
@@ -798,27 +796,19 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   results.push(...networkResults);
   showPhaseProgress("Network", networkResults, phaseStart);
 
-  // Phase 7: Database (requires VM)
+  // Phase 6: Database (requires VM)
   phaseStart = Date.now();
   cli.info("Checking database...");
   verbose("Checking database...");
-  const dbResults = checkDatabase(ctx);
+  const dbResults = await checkDatabase(ctx);
   results.push(...dbResults);
   showPhaseProgress("Database", dbResults, phaseStart);
 
-  // Phase 8: Configuration (can run without VM but more useful with)
-  phaseStart = Date.now();
-  cli.info("Checking configuration...");
-  verbose("Checking configuration...");
-  const configResults = checkConfiguration(ctx);
-  results.push(...configResults);
-  showPhaseProgress("Configuration", configResults, phaseStart);
-
-  // Phase 9: Log files (requires VM)
+  // Phase 7: Log files (requires VM)
   phaseStart = Date.now();
   cli.info("Checking log files...");
   verbose("Checking log files...");
-  const logResults = checkLogFiles(ctx);
+  const logResults = await checkLogFiles(ctx);
   results.push(...logResults);
   showPhaseProgress("Log Files", logResults, phaseStart);
 
