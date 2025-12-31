@@ -709,7 +709,7 @@ function showPhaseProgress(phaseName: string, phaseResults: CheckResult[], start
   }
 }
 
-async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
+async function runAllChecks(vvvPath: string, silent: boolean = false): Promise<CheckResult[]> {
   const ctx: CheckContext = {
     vvvPath,
     vmRunning: false,
@@ -722,7 +722,7 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
 
   // Phase 1: Prerequisites first (needed to populate ctx.availableProviders)
   phaseStart = Date.now();
-  cli.info("Running initial checks...");
+  if (!silent) cli.info("Running initial checks...");
   verbose("Checking prerequisites...");
 
   const prereqResults = await checkPrerequisites(ctx);
@@ -736,23 +736,23 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
   ]);
 
   results.push(...vvvResults, ...configResults);
-  showPhaseProgress("Initial Checks", [...prereqResults, ...vvvResults, ...configResults], phaseStart);
+  if (!silent) showPhaseProgress("Initial Checks", [...prereqResults, ...vvvResults, ...configResults], phaseStart);
 
   // Phase 2: VM State (determines if we can continue with VM-dependent checks)
   phaseStart = Date.now();
-  cli.info("Checking VM state...");
+  if (!silent) cli.info("Checking VM state...");
   verbose("Checking VM state...");
   const vmResults = await checkVmState(ctx);
   results.push(...vmResults);
-  showPhaseProgress("VM State", vmResults, phaseStart);
+  if (!silent) showPhaseProgress("VM State", vmResults, phaseStart);
 
   // Phase 3: Box Information
   phaseStart = Date.now();
-  cli.info("Checking box information...");
+  if (!silent) cli.info("Checking box information...");
   verbose("Checking box information...");
   const boxResults = await checkBoxInfo(ctx);
   results.push(...boxResults);
-  showPhaseProgress("Box Information", boxResults, phaseStart);
+  if (!silent) showPhaseProgress("Box Information", boxResults, phaseStart);
 
   // Check for port conflicts when using Docker and VM is NOT running
   // (if VM is running, it's using those ports legitimately)
@@ -780,41 +780,41 @@ async function runAllChecks(vvvPath: string): Promise<CheckResult[]> {
 
   // Fail fast if VM not running
   if (!ctx.vmRunning) {
-    cli.warning("VM is not running - skipping VM-dependent checks");
+    if (!silent) cli.warning("VM is not running - skipping VM-dependent checks");
     return results;
   }
 
   // Phase 4: Services (requires VM)
   phaseStart = Date.now();
-  cli.info("Checking services...");
+  if (!silent) cli.info("Checking services...");
   verbose("Checking services...");
   const serviceResults = await checkServices(ctx);
   results.push(...serviceResults);
-  showPhaseProgress("Services", serviceResults, phaseStart);
+  if (!silent) showPhaseProgress("Services", serviceResults, phaseStart);
 
   // Phase 5: Network (requires VM)
   phaseStart = Date.now();
-  cli.info("Checking network...");
+  if (!silent) cli.info("Checking network...");
   verbose("Checking network...");
   const networkResults = await checkNetwork(ctx);
   results.push(...networkResults);
-  showPhaseProgress("Network", networkResults, phaseStart);
+  if (!silent) showPhaseProgress("Network", networkResults, phaseStart);
 
   // Phase 6: Database (requires VM)
   phaseStart = Date.now();
-  cli.info("Checking database...");
+  if (!silent) cli.info("Checking database...");
   verbose("Checking database...");
   const dbResults = await checkDatabase(ctx);
   results.push(...dbResults);
-  showPhaseProgress("Database", dbResults, phaseStart);
+  if (!silent) showPhaseProgress("Database", dbResults, phaseStart);
 
   // Phase 7: Log files (requires VM)
   phaseStart = Date.now();
-  cli.info("Checking log files...");
+  if (!silent) cli.info("Checking log files...");
   verbose("Checking log files...");
   const logResults = await checkLogFiles(ctx);
   results.push(...logResults);
-  showPhaseProgress("Log Files", logResults, phaseStart);
+  if (!silent) showPhaseProgress("Log Files", logResults, phaseStart);
 
   return results;
 }
@@ -891,6 +891,6 @@ export const doctorCommand = new Command("doctor")
   .option("-p, --path <path>", "Path to VVV installation", DEFAULT_VVV_PATH)
   .option("--json", "Output as JSON")
   .action(async (options) => {
-    const results = await runAllChecks(options.path);
+    const results = await runAllChecks(options.path, options.json);
     displayResults(results, options.json);
   });
