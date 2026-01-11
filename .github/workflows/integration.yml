@@ -49,6 +49,13 @@ jobs:
           docker info
           docker --version
 
+      - name: Configure Docker access for Vagrant
+        run: |
+          # Ensure current user can access Docker socket
+          sudo chmod 666 /var/run/docker.sock
+          # Verify Docker works without sudo
+          docker ps
+
       - name: Run integration tests
         env:
           VVV_INTEGRATION_TEST: "1"
