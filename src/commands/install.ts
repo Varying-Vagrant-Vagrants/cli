@@ -201,7 +201,8 @@ export const installCommand = new Command("install")
       cli.success("Vagrant plugins installed");
 
       // Step 7b: Offer to configure passwordless hosts file access
-      if (!isSudoersConfigured()) {
+      // Skip in CI since it requires sudo and user interaction
+      if (!isSudoersConfigured() && process.env.CI === undefined) {
         const goodhostsBinary = findGoodhostsBinary(targetPath);
         if (goodhostsBinary) {
           console.log("");

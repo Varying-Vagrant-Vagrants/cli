@@ -155,8 +155,19 @@ export function exitWithError(message: string, suggestion?: string | number, cod
 /**
  * Ask the user a question and return their response.
  * If a default value is provided, it will be shown and used if the user presses Enter.
+ * In CI mode, automatically returns the default value without prompting.
  */
 export function askQuestion(question: string, defaultValue?: string): Promise<string> {
+  // In CI mode, return default value without prompting
+  if (process.env.CI !== undefined) {
+    if (defaultValue !== undefined) {
+      verbose(`[CI] Auto-answering: ${question} => ${defaultValue}`);
+      return Promise.resolve(defaultValue);
+    }
+    // No default in CI - this is a problem
+    throw new Error(`Cannot prompt in CI mode without default: ${question}`);
+  }
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -174,8 +185,15 @@ export function askQuestion(question: string, defaultValue?: string): Promise<st
 
 /**
  * Ask for yes/no confirmation. Returns true for yes, false for no.
+ * In CI mode, defaults to 'no' (false) for safety.
  */
-export async function confirm(question: string): Promise<boolean> {
+export async function confirm(question: string, defaultYes = false): Promise<boolean> {
+  // In CI mode, return default without prompting
+  if (process.env.CI !== undefined) {
+    verbose(`[CI] Auto-answering: ${question} => ${defaultYes ? "yes" : "no"}`);
+    return defaultYes;
+  }
+
   const answer = await askQuestion(`${question} (y/n)`);
   return answer.toLowerCase() === "y" || answer.toLowerCase() === "yes";
 }
