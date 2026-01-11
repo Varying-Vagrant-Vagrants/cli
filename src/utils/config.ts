@@ -77,6 +77,27 @@ export function vvvExists(vvvPath: string): boolean {
   return existsSync(vvvPath);
 }
 
+/**
+ * Set the Vagrant provider in vm_config section of config.yml.
+ * This ensures vagrant commands use the correct provider.
+ */
+export function setVmProvider(vvvPath: string, provider: string): void {
+  const configPath = getConfigPath(vvvPath);
+  const content = readFileSync(configPath, "utf-8");
+  const doc = parseDocument(content);
+
+  let vmConfig = doc.get("vm_config") as any;
+  if (!vmConfig) {
+    doc.set("vm_config", {});
+    vmConfig = doc.get("vm_config") as any;
+  }
+
+  // Uncomment the provider line or set it
+  vmConfig.set("provider", provider);
+
+  writeFileSync(configPath, doc.toString(), "utf-8");
+}
+
 export function setSiteSkipProvisioning(
   vvvPath: string,
   siteName: string,

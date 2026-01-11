@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { DEFAULT_VVV_PATH } from "../utils/config.js";
 import { ensureVvvExists, isVvvRunning, exitWithError, cli, startTimer } from "../utils/cli.js";
 import { ensureVagrantInstalled, vagrantRun } from "../utils/vagrant.js";
+import { getCurrentProvider } from "../utils/providers.js";
 import { displayTip } from "../utils/tips.js";
 
 export const reprovisionCommand = new Command("reprovision")
@@ -14,12 +15,17 @@ export const reprovisionCommand = new Command("reprovision")
     ensureVvvExists(vvvPath);
     ensureVagrantInstalled();
 
+    const provider = getCurrentProvider(vvvPath);
     const getElapsed = startTimer();
 
     if (!isVvvRunning(vvvPath)) {
       cli.info("VVV is not running. Starting it first (this may take a few minutes)...");
       console.log("");
-      const upCode = await vagrantRun(["up"], vvvPath);
+      const upArgs = ["up"];
+      if (provider) {
+        upArgs.push(`--provider=${provider}`);
+      }
+      const upCode = await vagrantRun(upArgs, vvvPath);
       if (upCode !== 0) {
         exitWithError("Failed to start VVV");
       }

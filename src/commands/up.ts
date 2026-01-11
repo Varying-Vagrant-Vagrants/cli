@@ -37,6 +37,12 @@ export const upCommand = new Command("up")
     }
 
     const args = ["up"];
+
+    // Add provider if configured (essential for first boot)
+    if (provider) {
+      args.push(`--provider=${provider}`);
+    }
+
     if (options.provision) {
       args.push("--provision");
     }

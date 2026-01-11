@@ -4,7 +4,7 @@ import { existsSync } from "fs";
 import { platform } from "os";
 import { join } from "path";
 import { cli, askQuestion, confirm, exitWithError, startTimer } from "../utils/cli.js";
-import { DEFAULT_VVV_PATH } from "../utils/config.js";
+import { DEFAULT_VVV_PATH, setVmProvider } from "../utils/config.js";
 import { type Provider, detectAvailableProvidersAsync } from "../utils/providers.js";
 import { findGoodhostsBinary, isSudoersConfigured } from "./hosts/sudoers.js";
 import { displayTip } from "../utils/tips.js";
@@ -264,6 +264,14 @@ export const installCommand = new Command("install")
     // Step 8: Copy default config
     if (copyDefaultConfig(targetPath)) {
       cli.success("Default configuration created");
+
+      // Step 8b: Set the provider in the config file
+      try {
+        setVmProvider(targetPath, selectedProvider.vagrantName);
+        cli.success(`Provider set to ${selectedProvider.vagrantName} in config`);
+      } catch (error) {
+        cli.warning(`Could not set provider in config: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
 
     const elapsed = getElapsed();
